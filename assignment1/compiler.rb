@@ -1,10 +1,82 @@
 #!/usr/bin/env ruby
 
-require_relative "ILParser/ILParser"
 
-print "Hello\n"
+# CSE 501 compiler project
+# requires ruby 1.9
 
-include ILParser
-ILParser.foo()
+require 'trollop'
+require 'minitest/benchmark' if ENV["BENCH"]
 
-print "Goodbye\n"
+# parse options
+opts = Trollop::options do
+  opt :filename, "IL file to process", :type => String, :default => 'test1.il'
+end
+
+
+class Type
+  attr_accessor :name, :members
+
+  def initialize( line )
+    fields = line.split(' ')
+
+    @name = fields[1].chomp(':')
+
+    @members = Array.new
+    typestring = line.gsub(/.*: /,'')
+    typestring.split(' ').each do |memberstring|
+      elems = memberstring.split(/[#:]/)
+      @members.push( { :name => elems[0], 
+                       :offset => elems[1].to_i,
+                       :type => elems[2] } )
+      puts "creating new Type #{@name} with members #{@members}"
+    end
+  end
+end
+
+class Method
+  attr_accessor :name, :args
+  
+  def initialize( name, typestring )
+    fields = line.split(' ')
+    @name = fields[1].chomp(':')
+    puts "creating new Method #{name} at address #{address} with args #{typestring}"
+    @name = name
+  end
+end
+
+
+# storage
+types = Array.new
+methods = Array.new
+globals = Array.new
+instructions = Array.new
+
+
+
+# parse file
+IO.foreach( opts[:filename] ) do |line|
+
+  fields = line.split(' ')
+
+  # what's the opcode?
+  case fields[0]
+
+  when 'type'
+    type = Type.new( line )
+    types.push( type )
+    
+  when 'method'
+    puts "found method #{fields[1]}"
+
+  when 'global'
+    puts "found global #{fields[1]}"
+
+  when 'instr'
+    puts "found instr #{fields[2]}"
+
+  else
+    raise 'unknown opcode'
+
+  end
+
+end
