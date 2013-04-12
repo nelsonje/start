@@ -17,7 +17,7 @@ class Function
 		@bbs.each do |bb|
 			last_inst = bb.instructions.last
 			case last_inst.opcode
-			when "call", "br"
+			when "br"
 				target = last_inst.operands[0]
 				target_bb = bb_index[target]
 				bb.sucs.push target_bb
