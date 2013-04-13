@@ -6,7 +6,11 @@ class Program
 	def initialize
 		@instructions = [nil]
 		@header = []
+		
+		# maps name of function to index of first instruction
 		@functions_info = {}
+		
+		# maps name of function to function object
 		@functions = {}
 	end
 
