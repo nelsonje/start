@@ -38,8 +38,19 @@ class Method
   
   def initialize( name, typestring )
     fields = line.split(' ')
+
     @name = fields[1].chomp(':')
-    puts "creating new Method #{name} at address #{address} with args #{typestring}"
+
+    @members = Array.new
+    typestring = line.gsub(/.*: /,'')
+    typestring.split(' ').each do |memberstring|
+      elems = memberstring.split(/[#:]/)
+      @members.push( { :name => elems[0], 
+                       :offset => elems[1].to_i,
+                       :type => elems[2] } )
+      puts "creating new Type #{@name} with members #{@members}"
+    end
+
     @name = name
   end
 end
