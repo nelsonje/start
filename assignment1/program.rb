@@ -19,9 +19,11 @@ class Program
 
 	public
 	def dump_cfgs
-		file = File.new("output/cfg.dot", "w")
+                index = 0
 		@functions.each do |name, f|
-			file.puts "digraph cfg {"
+                        file = File.new("output/cfg" + index.to_s + ".dot", "w")
+                        index += 1
+                        file.puts "digraph cfg {"
 			file.puts "node [shape=record];"
 			file.puts "splines=true;"
 			file.puts "entry [label=\"Entry\"];"
@@ -43,13 +45,15 @@ class Program
 
 			for i in 0...f.bbs.length
 				f.bbs[i].sucs.each do |s|
-					file.print("n" + i.to_s + ":c" + (f.bbs[i].instructions.length - 1).to_s)
-					file.print(" -> n" + (f.bbs.find_index(s)).to_s + ":c0;\n")
+#					file.print("n" + i.to_s + ":c" + (f.bbs[i].instructions.length - 1).to_s)
+#					file.print(" -> n" + (f.bbs.find_index(s)).to_s + ":c0;\n")
+					file.print("n" + i.to_s )
+					file.print(" -> n" + (f.bbs.find_index(s)).to_s + ";\n")
 				end
 			end
 			file.print "}\n\n"
+                        file.close
 		end
-		file.close
 	end
 
 	private

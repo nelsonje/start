@@ -74,12 +74,27 @@ class Function
 
           # record topological ids in bbs
           index = 0
+          max = @topo.length - 1
           @topo.each do |bb|
             bb.topo_id = index
+            bb.postorder_id = max - index
             index += 1
           end
 
         end
+
+        public
+        def print_doms
+          puts "Dominators"
+          @doms.each_index do |i|
+            if @doms[i].nil?
+              puts @topo[i].id.to_s + ": idom nil"
+            else
+              puts @topo[i].id.to_s + ": idom " + @doms[i].id.to_s
+            end
+          end
+        end
+
 
         public
         def find_doms
@@ -97,13 +112,16 @@ class Function
             while finger1 != finger2
               puts "Refining with " + finger1.id.to_s + " and " + finger2.id.to_s
 
-              while finger1.topo_id < finger2.topo_id
-                puts "Finger1 " + finger1.id.to_s + " = " + @doms[ finger1.topo_id ].id.to_s
+              while finger1.postorder_id < finger2.postorder_id
+                puts "1: finger1=" + finger1.id.to_s + " finger2=" + finger2.id.to_s
+                print_doms
                 finger1 = @doms[ finger1.topo_id ]
+                puts "1a: finger1=" + finger1.id.to_s + " finger2=" + finger2.id.to_s
               end
-              while finger2.topo_id < finger1.topo_id
-                puts "Finger2 " + finger2.id.to_s + " (" + finger2.topo_id.to_s + ")" + " = " + @doms[ finger2.topo_id ].id.to_s + " (" + @doms[ finger2.topo_id ].topo_id.to_s + ")"
+              while finger2.postorder_id < finger1.postorder_id
+                puts "2: finger1=" + finger1.id.to_s + " finger2=" + finger2.id.to_s
                 finger2 = @doms[ finger2.topo_id ]
+                puts "2a: finger1=" + finger1.id.to_s + " finger2=" + finger2.id.to_s
               end
             end
 
@@ -121,7 +139,7 @@ class Function
           puts "Starting doms from " + start.id.to_s
           puts "Topo order"
           @topo.each do |t|
-            puts t.id.to_s
+            puts t.id.to_s + ": postorder id " + t.postorder_id.to_s
           end
 
           # loop while something changed
@@ -129,6 +147,7 @@ class Function
           while changed
             
             changed = false
+            # postorder iteration
             @topo.reverse.each do |bb|
               # skip first node
               if bb != start
@@ -159,11 +178,7 @@ class Function
 
           end
 
-          puts "Dominators"
-          @doms.each_index do |i|
-            puts @topo[i].id.to_s + ": idom " + @doms[i].id.to_s
-          end
-
+          print_doms
 
         end
 

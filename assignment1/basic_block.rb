@@ -1,5 +1,5 @@
 class BasicBlock
-	attr_accessor :sucs, :preds, :instructions, :id, :visited, :topo_id
+	attr_accessor :sucs, :preds, :instructions, :id, :visited, :topo_id, :postorder_id
 
 	def initialize(insts, first, last)
 		@sucs = []
