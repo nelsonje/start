@@ -12,6 +12,9 @@ class Program
 		
 		# maps name of function to function object
 		@functions = {}
+
+          @doms = []
+          
 	end
 
 	public
@@ -23,7 +26,7 @@ class Program
 			file.puts "splines=true;"
 			file.puts "entry [label=\"Entry\"];"
 			for i in 0...f.bbs.length
-				file.print("n" + i.to_s + " [label=\"{")
+				file.print("n" + i.to_s + " [label=\"{BB " + f.bbs[i].id.to_s + "|")
 				for inst in 0...f.bbs[i].instructions.length
 					text = ""
 					f.bbs[i].instructions[inst].inst_str.each {|str| text << " " << str}
@@ -142,5 +145,20 @@ class Program
 			f.build_cfg
 		end
 	end
+
+
+
+
+        def build_doms
+		@functions.each do |name, f|
+			f.find_doms
+		end
+        end
+
+
+        
+
+
+
 end
 

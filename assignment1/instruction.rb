@@ -1,12 +1,14 @@
 class Instruction
-	attr_accessor	:opcode, :operands
+	attr_accessor	:id, :opcode, :operands
 	attr_reader	:inst_str
 
 	def initialize(inst)
 		if inst[0] == "instr"
 			@opcode = inst[2]
+                  @id = Integer( inst[1].chomp(':') )
 		else
 			@opcode = inst[0]
+                  @id = -1
 		end
 		@operands = []
 		case @opcode
