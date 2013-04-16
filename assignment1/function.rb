@@ -114,7 +114,7 @@ class Function
 
               while finger1.postorder_id < finger2.postorder_id
                 puts "1: finger1=" + finger1.id.to_s + " finger2=" + finger2.id.to_s
-                print_doms
+#                print_doms
                 finger1 = @doms[ finger1.topo_id ]
                 puts "1a: finger1=" + finger1.id.to_s + " finger2=" + finger2.id.to_s
               end
@@ -136,7 +136,9 @@ class Function
           # start with first node
           @doms[0] = @topo[0]
           start = @topo[0]
+          start.dom_processed = true
           puts "Starting doms from " + start.id.to_s
+
           puts "Topo order"
           @topo.each do |t|
             puts t.id.to_s + ": postorder id " + t.postorder_id.to_s
@@ -148,32 +150,43 @@ class Function
             
             changed = false
             # postorder iteration
-            @topo.reverse.each do |bb|
+            @topo.each do |bb|
               # skip first node
               if bb != start
 
-                new_idom = nil
-                bb.preds.each_index do |i|
-                  pred = bb.preds[i]
-                  if i == 0
-                    puts "Initial new_idom for " + bb.id.to_s + " is " + pred.id.to_s
-                    new_idom = pred
-                  else
+                initial_new_idom = nil
+
+                # find an already-processed predecessor
+                bb.preds.each do |pred|
+                  if pred.dom_processed
+                    initial_new_idom = pred
+                    break
+                  end
+                end
+
+                # if necessary, refine based on other predecessors 
+                new_idom = initial_new_idom
+                bb.preds.each do |pred|
+                  if pred != initial_new_idom
                     # if we already have a dominator for this predecessor,
                     if !@doms[ pred.topo_id ].nil?
-                      # refine it
+                      # see if it gets us a better dominator
                       puts "Need to find better new_idom for " + bb.id.to_s
                       new_idom = intersect pred, new_idom 
                     end
                   end
                 end
 
+                # if domintor changed, update it
                 if @doms[bb.topo_id] != new_idom
                   @doms[bb.topo_id] = new_idom
                   changed = true
                 end
 
-              end
+              end # if bb != start
+
+              # mark as processed
+              bb.dom_processed = true
             end
 
           end

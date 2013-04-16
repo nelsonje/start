@@ -1,5 +1,5 @@
 class BasicBlock
-	attr_accessor :sucs, :preds, :instructions, :id, :visited, :topo_id, :postorder_id
+	attr_accessor :sucs, :preds, :instructions, :id, :visited, :topo_id, :postorder_id, :dom_processed
 
 	def initialize(insts, first, last)
 		@sucs = []
@@ -9,6 +9,7 @@ class BasicBlock
 			@instructions.push insts[i]
 		end
           @visited = :unvisited
+          @dom_processed = false
 	end
 
 
