@@ -49,7 +49,10 @@ dominator tree edges to the CFG.
 
 Our optimizer writes two forms of output. First, it dumps the all the
 requested information about blocks, instructions, and dominators to a
-file. Second, it writes the CFGs in GraphViz (dot) format.
+file. Second, it writes the CFGs in GraphViz format. This may be
+converted to a graphical representation using the \texttt{dot} program.
+
+\section{Running}
 
 The optimizer may be run by executing the run.sh script in the
 \texttt{assignment1} directory. We have included precompiled
@@ -57,8 +60,11 @@ intermediate languages files for all examples in the
 distribution. Running the script will create separate output files in
 the \texttt{examples} directory for each method of each example; dump
 information has the extension \texttt{.txt}, and CFG output has the
-extension \texttt{.dot}. The GraphViz files can be turned into PDF
-with a command like \texttt{dot -Tpdf file.dot > file.pdf}.
+extension \texttt{.dot}. For example, the resuls for the GCD method in
+\texttt{gdc.dart} can be found in
+\texttt{examples/gcd.dart.il-main-info.txt}. The GraphViz files can
+be turned into PDF with a command like \texttt{dot -Tpdf file.dot >
+  file.pdf}.
 
 Our optimizer is implemented in Ruby, so no separate build step is
 required. Ruby version 1.9 is required.

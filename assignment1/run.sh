@@ -1,3 +1,5 @@
+#!/bin/bash
+
 ruby main.rb ../examples/class.dart.il
 ruby main.rb ../examples/gcd.dart.il
 ruby main.rb ../examples/hanoifibfac.dart.il
