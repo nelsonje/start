@@ -2,19 +2,14 @@ require_relative 'program'
 
 p = Program.new
 p.read_program(ARGV[0])
-#p.build_cfgs
+
 p.build_bbs
 p.build_cfgs
 
-#start_time = Time.now.to_f
 p.build_doms
-#elapsed_time = Time.now.to_f - start_time
-#puts "Dominator construction took " + elapsed_time.to_s + " seconds"
 
 p.dump_cfgs ARGV[0]
 p.dump_info ARGV[0]
-
-#p.dump_nodes_edges
 
 
 
