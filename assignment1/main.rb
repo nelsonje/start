@@ -11,6 +11,7 @@ p.build_doms
 elapsed_time = Time.now - start_time
 puts "Dominator construction took " + elapsed_time.to_s + " seconds"
 
-p.dump_cfgs
+p.dump_cfgs ARGV[0]
+
 
 

@@ -18,17 +18,18 @@ class Program
 	end
 
 	public
-	def dump_cfgs
+	def dump_cfgs(filename)
                 index = 0
 		@functions.each do |name, f|
-                        file = File.new("output/cfg" + index.to_s + ".dot", "w")
+                        this_filename = filename + "-" + f.name + "-cfg.dot"
+                        file = File.new( this_filename, "w")
                         index += 1
                         file.puts "digraph cfg {"
 			file.puts "node [shape=record];"
 			file.puts "splines=true;"
 			file.puts "entry [label=\"Entry\"];"
 			for i in 0...f.bbs.length
-				file.print("n" + i.to_s + " [label=\"{BB " + f.bbs[i].id.to_s + "|")
+				file.print("n" + i.to_s + " [label=\"{BB " + f.bbs[i].id.to_s + " (idom " + f.bbs[i].idom.id.to_s + ")|")
 				for inst in 0...f.bbs[i].instructions.length
 					text = ""
 					f.bbs[i].instructions[inst].inst_str.each {|str| text << " " << str}

@@ -1,5 +1,5 @@
 class Function
-	attr_accessor :bbs
+	attr_accessor :bbs, :name
 	def initialize(name)
 		@name = name
 		@bbs = []
@@ -66,7 +66,7 @@ class Function
           # compute topological order
           @bbs.each do |bb|
             # recurse down all unvisited blocks that are connected to something
-            if bb.visited == :unvisited and !(bb.sucs.empty? and bb.preds.empty?)
+            if bb.visited == :unvisited
               visit bb
             end
           end
@@ -104,7 +104,6 @@ class Function
           # compute order
           find_topo_order
 
-
           # helper for dominator constructor
           def intersect( b1, b2 )
             finger1 = b1
@@ -126,7 +125,7 @@ class Function
           @topo.each do |bb|
             @doms.push nil
           end
-          
+
           # start with first node
           @doms[0] = @topo[0]
           start = @topo[0]
@@ -185,7 +184,15 @@ class Function
 
           end
 
-          # print_doms
+          # initialize idom fields
+          @bbs.each do |bb|
+            bb.idom = @doms[bb.topo_id]
+            # clean up leftover nop nodes, etc.
+            if bb.idom.nil?
+              bb.idom = bb
+            end
+          end
+          
 
         end
 
