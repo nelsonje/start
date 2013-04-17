@@ -17,21 +17,11 @@ class Program
           
 	end
 
-	#public
-	#def dump_nodes_edges
-	#	@functions.each do |name, f|
-	#		puts f.name
-	#		puts f.n_nodes
-	#		puts f.n_edges
-	#		puts "\n\n"
-	#	end
-	#end
-
 	public
 	def dump_info(filename)
-		file = File.new(filename, "w")
-		file.print("\n\n");
 		@functions.each do |name, f|
+                	this_filename = filename + "-" + f.name + "-info.txt"
+			file = File.new(this_filename, "w")
 			file.print("Function " + f.name + "\nEntry index: " + @functions_info[f.name].to_s + "\n\n\n")
 			f.bbs.each do |bb|
 				bb.instructions.each do |i|
@@ -63,9 +53,8 @@ class Program
 				end
 				file.print("\nImmediate dominator: " + bb.idom.id.to_s + "\n\n\n") 
 			end
-			file.puts "\n\n------------------------------------------------------------------\n"
+			file.close
 		end
-		file.close
 	end
 
 	public
@@ -99,8 +88,6 @@ class Program
                           file.print("n" + i.to_s )
                           file.print(" -> n" + f.bbs.find_index(f.bbs[i].idom).to_s + " [color=red,style=dashed];\n")
 				f.bbs[i].sucs.each do |s|
-#					file.print("n" + i.to_s + ":c" + (f.bbs[i].instructions.length - 1).to_s)
-#					file.print(" -> n" + (f.bbs.find_index(s)).to_s + ":c0;\n")
 					file.print("n" + i.to_s )
 					file.print(" -> n" + (f.bbs.find_index(s)).to_s + ";\n")
 				end
@@ -209,14 +196,14 @@ class Program
 
         def build_doms
 		@functions.each do |name, f|
-			start_time = Time.now.to_f
+			#start_time = Time.now.to_f
 			f.find_doms
-			elapsed_time = Time.now.to_f - start_time
-			puts "Function: " + f.name
-			puts "Dominator construction took " + elapsed_time.to_s + " secs"
-			puts "Nodes: " + f.n_nodes.to_s
-			puts "Edges: " + f.n_edges.to_s
-			puts "\n\n"
+			#elapsed_time = Time.now.to_f - start_time
+			#puts "Function: " + f.name
+			#puts "Dominator construction took " + elapsed_time.to_s + " secs"
+			#puts "Nodes: " + f.n_nodes.to_s
+			#puts "Edges: " + f.n_edges.to_s
+			#puts "\n\n"
 		end
         end
 

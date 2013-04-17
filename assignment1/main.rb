@@ -12,6 +12,7 @@ p.build_doms
 #puts "Dominator construction took " + elapsed_time.to_s + " seconds"
 
 p.dump_cfgs ARGV[0]
+p.dump_info ARGV[0]
 
 #p.dump_nodes_edges
 
