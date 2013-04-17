@@ -22,13 +22,17 @@ class Function
 			when "br"
 				target = last_inst.operands[0]
 				target_bb = bb_index[target]
-				bb.sucs.push target_bb
-				target_bb.preds.push bb
+				if !bb.sucs.empty? && (target_bb != bb.sucs[0])
+					bb.sucs.push target_bb
+					target_bb.preds.push bb
+				end
 			when "blbc", "blbs"
 				target = last_inst.operands[1]
 				target_bb = bb_index[target]
-				bb.sucs.push target_bb
-				target_bb.preds.push bb
+				if !bb.sucs.empty? && (target_bb != bb.sucs[0])
+					bb.sucs.push target_bb
+					target_bb.preds.push bb
+				end
 			end
 		end
 	end
