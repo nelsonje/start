@@ -66,7 +66,7 @@ class Function
           # compute topological order
           @bbs.each do |bb|
             # recurse down all unvisited blocks that are connected to something
-            if bb.visited == :unvisited
+            if bb.visited == :unvisited && bb.ignore == false
               visit bb
             end
           end
@@ -82,6 +82,10 @@ class Function
             bb.postorder_id = max - index
             index += 1
           end
+
+          # @topo.each do |bb|
+          #   puts "Topo: " + bb.id.to_s 
+          # end
 
         end
 
@@ -127,8 +131,8 @@ class Function
           end
 
           # start with first node
-          @doms[0] = @topo[0]
           start = @topo[0]
+          @doms[0] = start
           start.dom_processed = true
 #          puts "Starting doms from " + start.id.to_s
 
@@ -146,6 +150,7 @@ class Function
             @topo.each do |bb|
               # skip first node
               if bb != start
+#                puts "Trying " + bb.id.to_s
 
                 initial_new_idom = nil
 
@@ -176,20 +181,22 @@ class Function
                   changed = true
                 end
 
+#                puts "Done with " + bb.id.to_s
+                # mark as processed
+                bb.dom_processed = true
               end # if bb != start
-
-              # mark as processed
-              bb.dom_processed = true
             end
 
           end
 
           # initialize idom fields
           @bbs.each do |bb|
-            bb.idom = @doms[bb.topo_id]
             # clean up leftover nop nodes, etc.
-            if bb.idom.nil?
+            topo_id = bb.topo_id
+            if topo_id.nil?
               bb.idom = bb
+            else 
+              bb.idom = @doms[bb.topo_id]
             end
           end
           

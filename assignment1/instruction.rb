@@ -1,11 +1,16 @@
 class Instruction
 	attr_accessor	:id, :opcode, :operands
-	attr_reader	:inst_str
+	attr_reader	:inst_str, :nop
 
 	def initialize(inst)
 		if inst[0] == "instr"
 			@opcode = inst[2]
                   @id = Integer( inst[1].chomp(':') )
+                  if @opcode.eql? "nop"
+                    @nop = true
+                  else 
+                    @nop = false
+                  end
 		else
 			@opcode = inst[0]
                   @id = -1

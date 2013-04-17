@@ -22,6 +22,14 @@ class BasicBlock
           end
         end
 
+        def ignore
+          if @instructions.empty?
+            return false
+          else
+            return instructions[0].nop
+          end
+        end
+
 
 
 

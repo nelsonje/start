@@ -81,6 +81,8 @@ class Program
 			file.puts("entry -> n0;") if !(f.bbs.empty?)
 
 			for i in 0...f.bbs.length
+                          file.print("n" + i.to_s )
+                          file.print(" -> n" + f.bbs.find_index(f.bbs[i].idom).to_s + " [color=red,style=dashed];\n")
 				f.bbs[i].sucs.each do |s|
 #					file.print("n" + i.to_s + ":c" + (f.bbs[i].instructions.length - 1).to_s)
 #					file.print(" -> n" + (f.bbs.find_index(s)).to_s + ":c0;\n")
