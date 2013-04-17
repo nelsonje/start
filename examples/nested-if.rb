@@ -1,6 +1,6 @@
 
 # generate nested-if.dart with the appropriate amount of nesting
-
+# usage: ruby nested-if.rb <total node count> <per-nest node count> > nested-if.dart
 nodecount = ARGV[0].to_i
 inedgecount = ARGV[1].to_i
 
