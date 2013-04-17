@@ -59,7 +59,6 @@ class Function
 
               # now finish this node
               bb.visited = :visited
-              puts "Visiting " + bb.id.to_s
               @topo.push bb
             end
           end
@@ -68,7 +67,6 @@ class Function
           @bbs.each do |bb|
             # recurse down all unvisited blocks that are connected to something
             if bb.visited == :unvisited and !(bb.sucs.empty? and bb.preds.empty?)
-              print "Starting from ", bb.id, "\n"
               visit bb
             end
           end
@@ -104,28 +102,20 @@ class Function
         def find_doms
           
           # compute order
-          print "Starting\n"
           find_topo_order
 
 
-          # helper for doms
+          # helper for dominator constructor
           def intersect( b1, b2 )
             finger1 = b1
             finger2 = b2
 
             while finger1 != finger2
-              puts "Refining with " + finger1.id.to_s + " and " + finger2.id.to_s
-
               while finger1.postorder_id < finger2.postorder_id
-                puts "1: finger1=" + finger1.id.to_s + " finger2=" + finger2.id.to_s
-#                print_doms
                 finger1 = @doms[ finger1.topo_id ]
-                puts "1a: finger1=" + finger1.id.to_s + " finger2=" + finger2.id.to_s
               end
               while finger2.postorder_id < finger1.postorder_id
-                puts "2: finger1=" + finger1.id.to_s + " finger2=" + finger2.id.to_s
                 finger2 = @doms[ finger2.topo_id ]
-                puts "2a: finger1=" + finger1.id.to_s + " finger2=" + finger2.id.to_s
               end
             end
 
@@ -141,12 +131,12 @@ class Function
           @doms[0] = @topo[0]
           start = @topo[0]
           start.dom_processed = true
-          puts "Starting doms from " + start.id.to_s
+#          puts "Starting doms from " + start.id.to_s
 
-          puts "Topo order"
-          @topo.each do |t|
-            puts t.id.to_s + ": postorder id " + t.postorder_id.to_s
-          end
+          # puts "Topo order"
+          # @topo.each do |t|
+          #   puts t.id.to_s + ": postorder id " + t.postorder_id.to_s
+          # end
 
           # loop while something changed
           changed = true
@@ -175,7 +165,7 @@ class Function
                     # if we already have a dominator for this predecessor,
                     if !@doms[ pred.topo_id ].nil?
                       # see if it gets us a better dominator
-                      puts "Need to find better new_idom for " + bb.id.to_s
+                      # puts "Need to find better new_idom for " + bb.id.to_s
                       new_idom = intersect pred, new_idom 
                     end
                   end
@@ -195,7 +185,7 @@ class Function
 
           end
 
-          print_doms
+          # print_doms
 
         end
 
