@@ -18,6 +18,42 @@ class Program
 	end
 
 	public
+	def dump_info(filename)
+		file = File.new(filename, "w")
+		file.print("\n\n");
+		@functions.each do |f|
+			file.print("Function " + f.name + "\nEntry index: " + @functions_info[f.name] + "\n")
+			@functions.bbs.each do |bb|
+				bb.instructions.each { |i| file.puts i.inst_str}
+				file.print("Predecessors: ")
+				if bb.preds.empty?
+					print "none.\n"
+				else
+					bb.preds.each_index do |index|
+						if index != 0
+							print ", "
+						end
+						print bb.preds[index].id
+					end
+				end
+				file.print("\nSuccessors: ")
+				if bb.sucs.empty?
+					print "none.\n"
+				else
+					bb.sucs.each_index do |index|
+						if index != 0
+							print ", "
+						end
+						print bb.sucs[index].id
+					end
+				end
+				file.print("Immediate dominator: " + bb.idom + "\n") 
+			end
+		end
+		file.close
+	end
+
+	public
 	def dump_cfgs(filename)
                 index = 0
 		@functions.each do |name, f|
