@@ -8,6 +8,20 @@ class Function
 	end
 
 	public
+	def n_nodes
+		@bbs.length
+	end
+
+	public
+	def n_edges
+		n = 0
+		@bbs.each do |bb|
+			n += bb.sucs.length
+		end
+		n
+	end
+
+	public
 	def build_cfg
 		#This assures that building CFG is low complexity
 		bb_index = {}
@@ -22,10 +36,8 @@ class Function
 			when "br"
 				target = last_inst.operands[0]
 				target_bb = bb_index[target]
-#				if !bb.sucs.empty? && (target_bb != bb.sucs[0])
 					bb.sucs.push target_bb
 					target_bb.preds.push bb
-#				end
 			when "blbc", "blbs"
 				target = last_inst.operands[1]
 				target_bb = bb_index[target]

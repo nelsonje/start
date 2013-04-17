@@ -17,6 +17,16 @@ class Program
           
 	end
 
+	#public
+	#def dump_nodes_edges
+	#	@functions.each do |name, f|
+	#		puts f.name
+	#		puts f.n_nodes
+	#		puts f.n_edges
+	#		puts "\n\n"
+	#	end
+	#end
+
 	public
 	def dump_info(filename)
 		file = File.new(filename, "w")
@@ -199,7 +209,14 @@ class Program
 
         def build_doms
 		@functions.each do |name, f|
+			start_time = Time.now.to_f
 			f.find_doms
+			elapsed_time = Time.now.to_f - start_time
+			puts "Function: " + f.name
+			puts "Dominator construction took " + elapsed_time.to_s + " secs"
+			puts "Nodes: " + f.n_nodes.to_s
+			puts "Edges: " + f.n_edges.to_s
+			puts "\n\n"
 		end
         end
 
