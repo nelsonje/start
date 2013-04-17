@@ -21,34 +21,39 @@ class Program
 	def dump_info(filename)
 		file = File.new(filename, "w")
 		file.print("\n\n");
-		@functions.each do |f|
-			file.print("Function " + f.name + "\nEntry index: " + @functions_info[f.name] + "\n")
-			@functions.bbs.each do |bb|
-				bb.instructions.each { |i| file.puts i.inst_str}
+		@functions.each do |name, f|
+			file.print("Function " + f.name + "\nEntry index: " + @functions_info[f.name].to_s + "\n\n\n")
+			f.bbs.each do |bb|
+				bb.instructions.each do |i|
+					text = ""
+					i.inst_str.each {|str| text << str << " "}
+					file.puts text
+				end
 				file.print("Predecessors: ")
 				if bb.preds.empty?
-					print "none.\n"
+					file.print "none"
 				else
 					bb.preds.each_index do |index|
 						if index != 0
-							print ", "
+							file.print ", "
 						end
-						print bb.preds[index].id
+						file.print bb.preds[index].id.to_s
 					end
 				end
 				file.print("\nSuccessors: ")
 				if bb.sucs.empty?
-					print "none.\n"
+					file.print "none"
 				else
 					bb.sucs.each_index do |index|
 						if index != 0
-							print ", "
+							file.print ", "
 						end
-						print bb.sucs[index].id
+						file.print bb.sucs[index].id.to_s
 					end
 				end
-				file.print("Immediate dominator: " + bb.idom + "\n") 
+				file.print("\nImmediate dominator: " + bb.idom.id.to_s + "\n\n\n") 
 			end
+			file.puts "\n\n------------------------------------------------------------------\n"
 		end
 		file.close
 	end
