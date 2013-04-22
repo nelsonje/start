@@ -11,6 +11,6 @@ p.build_doms
 #p.dump_cfgs ARGV[0]
 #p.dump_info ARGV[0]
 
-p.compute_dom_fronts
+p.to_ssa
 
 

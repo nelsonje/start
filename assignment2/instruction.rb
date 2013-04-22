@@ -46,8 +46,10 @@ class Instruction
     	@operands.push inst[3]
     	@operands.push inst[4]
     	@operands.push inst[5]
+    when "global", "nop", "entrypc", "wrl", nil, "type"
+    	p "Do something here"
     else
-    	puts "Unknown instructions detected: " + @opcode
+    	puts "Unknown instruction detected: " + @opcode
 	#TODO
 	#Since I don't know how to exit in Ruby, divide by zero LOL
 	5/0

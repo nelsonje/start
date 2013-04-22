@@ -5,6 +5,74 @@ class Function
     @bbs = []
     @topo = []
     @doms = []
+    #For each variable, gives the set of BBs in which it's assigned to.
+    #Necessary for SSA construction
+    @var_bb_def = {}
+  end
+
+  public
+  def to_ssa
+  	compute_df
+	set_vars_assign
+	place_phis
+  end
+
+  #TODO
+  #Handle the unknown instructions mentioned in Instruction.rb
+  private
+  def set_vars_assign
+  	@bbs.each do |bb|
+		bb.instructions.each do |inst|
+			case inst.opcode
+			when "sub", "add", "mul", "div", "mod", "cmpeq", "cmple", "cmplt", "istype", "checktype", "lddynamic", "isnull", "load", "new", "newlist", "checknull"
+				if @var_bb_def[inst.id.to_s] == nil
+					@var_bb_def[inst.id.to_s] = []
+				end
+				@var_bb_def[inst.id.to_s].push bb
+			when "move"
+				new_str = inst.operands.last.chomp(")")
+				new_str.sub!(/^[(]/, '')
+				if @var_bb_def[new_str] == nil
+					@var_bb_def[new_str] = []
+				end
+				@var_bb_def[new_str].push bb
+			end
+		end
+	end
+  end
+
+  private
+  def place_phis
+  	iter_count = 0
+	has_already = {}
+	work = {}
+	@bbs.each do |x|
+		has_already[x] = 0
+		work[x] = 0
+	end
+
+	w = []
+	@var_bb_def.each do |v, av|
+		iter_count += 1
+		av.each do |x|
+			work[x] = iter_count
+			w.push x
+		end
+		while !w.empty?
+			x = w.shift
+			x.df.each do |y|
+				if has_already[y] < iter_count
+					hash = { v => [] }
+					y.phi.merge! hash
+					has_already[y] = iter_count
+					if work[y] < iter_count
+						work[y] = iter_count
+						w.push y
+					end
+				end
+			end
+		end
+	end
   end
 
   public
@@ -214,7 +282,7 @@ class Function
 	end
 
 
-	public
+	private
 	def compute_df
 		#Build dominators tree
 		@bbs.each do |bb|

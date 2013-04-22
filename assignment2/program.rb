@@ -20,8 +20,8 @@ class Program
   end
 
   public
-  def compute_dom_fronts
-  	@functions.each {|name, f| f.compute_df}
+  def to_ssa
+  	@functions.each {|name, f| f.to_ssa}
   end
 
   public

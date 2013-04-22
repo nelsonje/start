@@ -1,5 +1,5 @@
 class BasicBlock
-  attr_accessor :sucs, :preds, :instructions, :id, :visited, :topo_id, :postorder_id, :dom_processed, :idom, :idominates, :df
+  attr_accessor :sucs, :preds, :instructions, :id, :visited, :topo_id, :postorder_id, :dom_processed, :idom, :idominates, :df, :phi
 
   def initialize(insts, first, last)
     @sucs = []
@@ -16,6 +16,8 @@ class BasicBlock
     @idominates = []
     #Dominance frontier
     @df = []
+    #Phi instructions
+    @phi = {}
   end
 
 
