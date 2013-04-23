@@ -82,6 +82,25 @@ class Function
 					new_str.sub!(/^[(]/, '')
 					@vars.push new_str
 				end
+			when "blbc", "blbs"
+				@vars.push inst.operands[0]
+			when "store", "checkbounds", "stdynamic"
+				if !is_constant(inst.operands[0])
+					new_str = inst.operands[0].chomp(")")
+					new_str.sub!(/^[(]/, '')
+					@vars.push new_str
+				end
+				if !is_constant(inst.operands[1])
+					new_str = inst.operands[1].chomp(")")
+					new_str.sub!(/^[(]/, '')
+					@vars.push new_str
+				end
+			when "write", "param"
+				if !is_constant(inst.operands[0])
+					new_str = inst.operands[0].chomp(")")
+					new_str.sub!(/^[(]/, '')
+					@vars.push new_str
+				end
 			end
 		end
 	end
