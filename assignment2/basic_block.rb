@@ -10,7 +10,7 @@ class BasicBlock
     end
     @visited = :unvisited
     @dom_processed = false
-    @idom = self
+    @idom = nil
     #BBs immediately dominated by this one.
     #Necessary for constructing the DF.
     @idominates = []

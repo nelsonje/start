@@ -76,7 +76,39 @@ class Program
       file.puts "splines=true;"
       file.puts "entry [label=\"Entry\"];"
       for i in 0...f.bbs.length
-        file.print("n" + i.to_s + " [label=\"{BB " + f.bbs[i].id.to_s + " (idom " + f.bbs[i].idom.id.to_s + ")|")
+        file.print("n" + i.to_s + " [label=\"{BB " + f.bbs[i].id.to_s + " (idom: ")
+	if f.bbs[i].idom  == nil
+		file.print("none")
+	else
+		file.print(f.bbs[i].idom.id.to_s)
+	end
+	file.print(")|")
+	file.print("DF:")
+	file.print(" empty") if f.bbs[i].df.empty?
+	f.bbs[i].df.each {|bb| file.print(" " + bb.id.to_s)}
+	file.print("|")
+
+
+	phi_counter = 0
+	f.bbs[i].phi.each do |var, options|
+		phi_counter += 1
+		text = ""
+		text << var << " = phi("
+		options.each_index do |i|
+			text << options[i]
+			if i != options.length - 1
+				text << ", "
+			end
+		end
+		text << ")"
+		file.print("<phi-" + var + "> " + text)
+		if (phi_counter == f.bbs[i].phi.length) && (f.bbs[i].instructions.length == 0)
+			file.print("}\"];\n")
+		else
+			file.print("|")
+		end
+	end
+
         for inst in 0...f.bbs[i].instructions.length
           text = ""
           f.bbs[i].instructions[inst].inst_str.each {|str| text << " " << str}
@@ -87,13 +119,14 @@ class Program
             file.print("|")
           end
         end
+
       end
 
       file.puts("entry -> n0;") if !(f.bbs.empty?)
 
       for i in 0...f.bbs.length
-        file.print("n" + i.to_s )
-        file.print(" -> n" + f.bbs.find_index(f.bbs[i].idom).to_s + " [color=red,style=dashed];\n")
+#        file.print("n" + i.to_s )
+#        file.print(" -> n" + f.bbs.find_index(f.bbs[i].idom).to_s + " [color=red,style=dashed];\n")
         f.bbs[i].sucs.each do |s|
           file.print("n" + i.to_s )
           file.print(" -> n" + (f.bbs.find_index(s)).to_s + ";\n")

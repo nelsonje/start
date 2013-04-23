@@ -8,9 +8,9 @@ p.build_cfgs
 
 p.build_doms
 
-#p.dump_cfgs ARGV[0]
 #p.dump_info ARGV[0]
 
 p.to_ssa
+p.dump_cfgs ARGV[0]
 
 

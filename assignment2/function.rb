@@ -8,6 +8,8 @@ class Function
     #For each variable, gives the set of BBs in which it's assigned to.
     #Necessary for SSA construction
     @var_bb_def = {}
+    #Set of all vars
+    @vars = []
   end
 
   public
@@ -17,6 +19,16 @@ class Function
 	place_phis
   end
 
+  #Differs (113) or i#-4 from 113 or 4.
+  private
+  def is_constant(str)
+  	if (str =~ /\(/) || (str =~ /#/)
+		false
+	else
+		true
+	end
+  end
+
   #TODO
   #Handle the unknown instructions mentioned in Instruction.rb
   private
@@ -24,11 +36,39 @@ class Function
   	@bbs.each do |bb|
 		bb.instructions.each do |inst|
 			case inst.opcode
-			when "sub", "add", "mul", "div", "mod", "cmpeq", "cmple", "cmplt", "istype", "checktype", "lddynamic", "isnull", "load", "new", "newlist", "checknull"
+			when "sub", "add", "mul", "div", "mod", "cmpeq", "cmple", "cmplt"
 				if @var_bb_def[inst.id.to_s] == nil
 					@var_bb_def[inst.id.to_s] = []
 				end
 				@var_bb_def[inst.id.to_s].push bb
+				@vars.push inst.id.to_s
+				if !is_constant(inst.operands[0])
+					new_str = inst.operands[0].chomp(")")
+					new_str.sub!(/^[(]/, '')
+					@vars.push new_str
+				end
+				if !is_constant(inst.operands[1])
+					new_str = inst.operands[1].chomp(")")
+					new_str.sub!(/^[(]/, '')
+					@vars.push new_str
+				end
+			when "istype", "checktype", "load", "isnull", "newlist", "checknull", "lddynamic"
+				if @var_bb_def[inst.id.to_s] == nil
+					@var_bb_def[inst.id.to_s] = []
+				end
+				@var_bb_def[inst.id.to_s].push bb
+				@vars.push inst.id.to_s
+				if !is_constant(inst.operands[0])
+					new_str = inst.operands[0].chomp(")")
+					new_str.sub!(/^[(]/, '')
+					@vars.push new_str
+				end
+			when "new"
+				if @var_bb_def[inst.id.to_s] == nil
+					@var_bb_def[inst.id.to_s] = []
+				end
+				@var_bb_def[inst.id.to_s].push bb
+				@vars.push inst.id.to_s
 			when "move"
 				new_str = inst.operands.last.chomp(")")
 				new_str.sub!(/^[(]/, '')
@@ -36,9 +76,17 @@ class Function
 					@var_bb_def[new_str] = []
 				end
 				@var_bb_def[new_str].push bb
+				@vars.push new_str
+				if !is_constant(inst.operands[0])
+					new_str = inst.operands[0].chomp(")")
+					new_str.sub!(/^[(]/, '')
+					@vars.push new_str
+				end
 			end
 		end
 	end
+	@vars.uniq!
+	@var_bb_def.each_value {|av| av.uniq!}
   end
 
   private
@@ -52,11 +100,15 @@ class Function
 	end
 
 	w = []
-	@var_bb_def.each do |v, av|
+	#@var_bb_def.each do |v, av|
+	@vars.each do |v|
 		iter_count += 1
-		av.each do |x|
-			work[x] = iter_count
-			w.push x
+		#av.each do |x|
+		if @var_bb_def[v] != nil
+			@var_bb_def[v].each do |x|
+				work[x] = iter_count
+				w.push x
+			end
 		end
 		while !w.empty?
 			x = w.shift
@@ -260,9 +312,8 @@ class Function
     @bbs.each do |bb|
       # clean up leftover nop nodes, etc.
       topo_id = bb.topo_id
-      if topo_id.nil?
-        bb.idom = bb
-      else 
+      #Bugfix: A node never idominates itself
+      if (!topo_id.nil?) && (@doms[bb.topo_id] != bb)
         bb.idom = @doms[bb.topo_id]
       end
     end
@@ -286,46 +337,9 @@ class Function
 	def compute_df
 		#Build dominators tree
 		@bbs.each do |bb|
-			bb.idom.idominates.push bb
+			bb.idom.idominates.push bb if bb.idom != nil
 		end
 		compute_df_helper @doms[0]
 	end
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 end
