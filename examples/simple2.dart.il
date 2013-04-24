@@ -5,12 +5,13 @@
     instr 4: cmpeq 1 2 :bool
     instr 5: blbc (4) [8]
     instr 6: move 1 x#-4
-    instr 7: br [13]
+    instr 7: br [14]
     instr 8: cmpeq 2 3 :bool
-    instr 9: blbc (8) [12]
+    instr 9: blbc (8) [13]
     instr 10: move 2 x#-4
-    instr 11: br [13]
-    instr 12: move 3 x#-4
-    instr 13: ret 0
-    instr 14: nop
+    instr 11: move 4 x#-4
+    instr 12: br [14]
+    instr 13: move 3 x#-4
+    instr 14: ret 0
+    instr 15: nop
 
