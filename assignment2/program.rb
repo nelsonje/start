@@ -91,6 +91,9 @@ class Program
 
 	phi_counter = 0
 	f.bbs[i].phi.each do |var, options|
+		if $debug
+		    puts "Adding phi node for #{var} with options #{options}"
+		end
 		phi_counter += 1
 		text = ""
 		text << var << " = phi("

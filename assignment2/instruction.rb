@@ -52,7 +52,7 @@ class Instruction
     	@operands.push inst[4]
     	@operands.push inst[5]
     when "global", "nop", "entrypc", "wrl", nil, "type"
-    	p "Do something here"
+	puts "Do something here for #{inst}"
     else
     	puts "Unknown instruction detected: " + @opcode
 	#TODO

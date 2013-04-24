@@ -16,6 +16,14 @@ class Function
     @s = []
   end
 
+  private
+  def push_var( var, inst )
+      if $debug
+	  puts "Adding var #{var} from instruction #{inst.inst_str}"
+      end
+      @vars.push var
+  end
+
   public
   def to_ssa
   	compute_df
@@ -91,18 +99,18 @@ class Function
 					@var_bb_def[inst.id.to_s] = []
 				end
 				@var_bb_def[inst.id.to_s].push bb
-				@vars.push inst.id.to_s
+				push_var inst.id.to_s, inst
 				inst.lhs.push inst.id.to_s
 				if !is_constant(inst.operands[0])
 					new_str = inst.operands[0].chomp(")")
 					new_str.sub!(/^[(]/, '')
-					@vars.push new_str
+					push_var new_str, inst
 					inst.rhs.push new_str
 				end
 				if !is_constant(inst.operands[1])
 					new_str = inst.operands[1].chomp(")")
 					new_str.sub!(/^[(]/, '')
-					@vars.push new_str
+					push_var new_str, inst
 					inst.rhs.push new_str
 				end
 			when "istype", "checktype", "load", "isnull", "newlist", "checknull", "lddynamic"
@@ -110,12 +118,12 @@ class Function
 					@var_bb_def[inst.id.to_s] = []
 				end
 				@var_bb_def[inst.id.to_s].push bb
-				@vars.push inst.id.to_s
+				push_var inst.id.to_s, inst
 				inst.lhs.push inst.id.to_s
 				if !is_constant(inst.operands[0])
 					new_str = inst.operands[0].chomp(")")
 					new_str.sub!(/^[(]/, '')
-					@vars.push new_str
+					push_var new_str, inst
 					inst.rhs.push new_str
 				end
 			when "new"
@@ -123,7 +131,7 @@ class Function
 					@var_bb_def[inst.id.to_s] = []
 				end
 				@var_bb_def[inst.id.to_s].push bb
-				@vars.push inst.id.to_s
+				push_var inst.id.to_s, inst
 				inst.lhs.push inst.id.to_s
 			when "move"
 				new_str = inst.operands.last.chomp(")")
@@ -132,41 +140,42 @@ class Function
 					@var_bb_def[new_str] = []
 				end
 				@var_bb_def[new_str].push bb
-				@vars.push new_str
+				push_var new_str, inst
 				inst.lhs.push new_str
 				if !is_constant(inst.operands[0])
 					new_str = inst.operands[0].chomp(")")
 					new_str.sub!(/^[(]/, '')
-					@vars.push new_str
+					push_var new_str, inst
 					inst.rhs.push new_str
 				end
 			when "blbc", "blbs"
-				@vars.push inst.operands[0].to_s
+				push_var inst.operands[0].to_s, inst
 				inst.rhs.push inst.operands[0].to_s
 			when "store", "checkbounds", "stdynamic"
 				if !is_constant(inst.operands[0])
 					new_str = inst.operands[0].chomp(")")
 					new_str.sub!(/^[(]/, '')
-					@vars.push new_str
+					push_var new_str, inst
 					inst.rhs.push new_str
 				end
 				if !is_constant(inst.operands[1])
 					new_str = inst.operands[1].chomp(")")
 					new_str.sub!(/^[(]/, '')
-					@vars.push new_str
+					push_var new_str, inst
 					inst.rhs.push new_str
 				end
 			when "write", "param"
 				if !is_constant(inst.operands[0])
 					new_str = inst.operands[0].chomp(")")
 					new_str.sub!(/^[(]/, '')
-					@vars.push new_str
+					push_var new_str, inst
 					inst.rhs.push new_str
 				end
 			end
 		end
 	end
 	@vars.uniq!
+	puts "Vars is #{@vars}"
 	@var_bb_def.each_value {|av| av.uniq!}
   end
 
@@ -196,6 +205,9 @@ class Function
 			x.df.each do |y|
 				if has_already[y] < iter_count
 					hash = { v => [] }
+					if $debug
+					    puts "At BB #{y.id} with variable #{v}, merging #{hash} into #{y.phi}"
+					end
 					y.phi.merge! hash
 					has_already[y] = iter_count
 					if work[y] < iter_count
