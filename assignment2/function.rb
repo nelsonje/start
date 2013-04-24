@@ -10,6 +10,10 @@ class Function
     @var_bb_def = {}
     #Set of all vars
     @vars = []
+
+    #Auxiliary vars needed for SSA construction (var renaming)
+    @c = []
+    @s = []
   end
 
   public
@@ -18,6 +22,52 @@ class Function
 	set_vars_assign
 	place_phis
   end
+
+  private
+  def which_pred(x, y)
+  	y.preds.each_index do |i|
+		if y.preds[i] == x
+			which = i
+		end
+	end
+	which
+  end
+
+  #private
+  #def search_phi_renaming(x)
+  #	x.instructions.each do |a|
+#		a.rhs.each do |v|
+#			a.operands.each do |operand|
+#				if operand == v
+#					operand = operand + "{" + @s[v].last.to_s + "}"
+#				end
+#			end
+#		end
+#		a.lhs.each do |v|
+#			i = @c[v]
+#			a.operands.each do |operand|
+#				if operand == v
+#					operand = operand + "{" + i.to_s + "}"
+#				end
+#			end
+#			@s[v].push i
+#			@c[v] = i + 1
+#		end
+#	end
+
+#	x.sucs.each do |y|
+#		j = which_pred(y, x)
+#	end
+#  end
+
+ # private
+ # def rename_vars
+  #	@vars.each do |v|
+#		@c[v] = 0
+#		@s[v] = []
+#	end
+#	search_phi_renaming(@doms[0])
+ # end
 
   #Differs (113) or i#-4 from 113 or 4.
   private
@@ -42,15 +92,18 @@ class Function
 				end
 				@var_bb_def[inst.id.to_s].push bb
 				@vars.push inst.id.to_s
+				inst.lhs.push inst.id.to_s
 				if !is_constant(inst.operands[0])
 					new_str = inst.operands[0].chomp(")")
 					new_str.sub!(/^[(]/, '')
 					@vars.push new_str
+					inst.rhs.push new_str
 				end
 				if !is_constant(inst.operands[1])
 					new_str = inst.operands[1].chomp(")")
 					new_str.sub!(/^[(]/, '')
 					@vars.push new_str
+					inst.rhs.push new_str
 				end
 			when "istype", "checktype", "load", "isnull", "newlist", "checknull", "lddynamic"
 				if @var_bb_def[inst.id.to_s] == nil
@@ -58,10 +111,12 @@ class Function
 				end
 				@var_bb_def[inst.id.to_s].push bb
 				@vars.push inst.id.to_s
+				inst.lhs.push inst.id.to_s
 				if !is_constant(inst.operands[0])
 					new_str = inst.operands[0].chomp(")")
 					new_str.sub!(/^[(]/, '')
 					@vars.push new_str
+					inst.rhs.push new_str
 				end
 			when "new"
 				if @var_bb_def[inst.id.to_s] == nil
@@ -69,6 +124,7 @@ class Function
 				end
 				@var_bb_def[inst.id.to_s].push bb
 				@vars.push inst.id.to_s
+				inst.lhs.push inst.id.to_s
 			when "move"
 				new_str = inst.operands.last.chomp(")")
 				new_str.sub!(/^[(]/, '')
@@ -77,29 +133,35 @@ class Function
 				end
 				@var_bb_def[new_str].push bb
 				@vars.push new_str
+				inst.lhs.push new_str
 				if !is_constant(inst.operands[0])
 					new_str = inst.operands[0].chomp(")")
 					new_str.sub!(/^[(]/, '')
 					@vars.push new_str
+					inst.rhs.push new_str
 				end
 			when "blbc", "blbs"
-				@vars.push inst.operands[0]
+				@vars.push inst.operands[0].to_s
+				inst.rhs.push inst.operands[0].to_s
 			when "store", "checkbounds", "stdynamic"
 				if !is_constant(inst.operands[0])
 					new_str = inst.operands[0].chomp(")")
 					new_str.sub!(/^[(]/, '')
 					@vars.push new_str
+					inst.rhs.push new_str
 				end
 				if !is_constant(inst.operands[1])
 					new_str = inst.operands[1].chomp(")")
 					new_str.sub!(/^[(]/, '')
 					@vars.push new_str
+					inst.rhs.push new_str
 				end
 			when "write", "param"
 				if !is_constant(inst.operands[0])
 					new_str = inst.operands[0].chomp(")")
 					new_str.sub!(/^[(]/, '')
 					@vars.push new_str
+					inst.rhs.push new_str
 				end
 			end
 		end

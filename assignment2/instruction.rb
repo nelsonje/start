@@ -1,8 +1,13 @@
 class Instruction
-  attr_accessor   :id, :opcode, :operands
+  attr_accessor   :id, :opcode, :operands, :rhs, :lhs
   attr_reader     :inst_str, :nop
 
   def initialize(inst)
+    #Necessary for SSA
+    #These are gonna be contructed when calling set_vars_assign
+    #for the function
+    @rhs = []
+    @lhs = []
     if inst[0] == "instr"
       @opcode = inst[2]
       @id = Integer( inst[1].chomp(':') )
