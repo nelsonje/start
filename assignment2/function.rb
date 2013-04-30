@@ -12,8 +12,8 @@ class Function
     @vars = []
 
     #Auxiliary vars needed for SSA construction (var renaming)
-    @c = []
-    @s = []
+    @c = {}
+    @s = {}
   end
 
   private
@@ -29,53 +29,80 @@ class Function
   	compute_df
 	set_vars_assign
 	place_phis
+	rename_vars
   end
 
   private
   def which_pred(x, y)
-  	y.preds.each_index do |i|
-		if y.preds[i] == x
+  	which = nil
+  	x.preds.each_index do |i|
+		if x.preds[i] == y
 			which = i
 		end
 	end
 	which
   end
 
-  #private
-  #def search_phi_renaming(x)
-  #	x.instructions.each do |a|
-#		a.rhs.each do |v|
-#			a.operands.each do |operand|
-#				if operand == v
-#					operand = operand + "{" + @s[v].last.to_s + "}"
-#				end
-#			end
-#		end
-#		a.lhs.each do |v|
-#			i = @c[v]
-#			a.operands.each do |operand|
-#				if operand == v
-#					operand = operand + "{" + i.to_s + "}"
-#				end
-#			end
-#			@s[v].push i
-#			@c[v] = i + 1
-#		end
-#	end
+  private
+  def search_phi_renaming(x)
+	x.phi.each do |left, right|
+		old_left = left.dup
+		i = @c[left]
+		left = left + "[" + i.to_s + "]"
+		@s[old_left].push i
+		@c[old_left] = i + 1
+	end
 
-#	x.sucs.each do |y|
-#		j = which_pred(y, x)
-#	end
-#  end
+  	x.instructions.each do |a|
+		a.rhs.each do |v|
+			a.operands.each do |operand|
+				if operand == v
+					operand = operand + "[" + @s[v].last.to_s + "]"
+				end
+			end
+		end
+		a.lhs.each do |v|
+			i = @c[v]
+			a.operands.each do |operand|
+				if operand == v
+					operand = operand + "[" + i.to_s + "]"
+				end
+			end
+			@s[v].push i
+			@c[v] = i + 1
+		end
+	end
 
- # private
- # def rename_vars
-  #	@vars.each do |v|
-#		@c[v] = 0
-#		@s[v] = []
-#	end
-#	search_phi_renaming(@doms[0])
- # end
+	x.sucs.each do |y|
+		j = which_pred(y, x)
+		y.phi.each do |left, right|
+			old_left = left.dup
+			old_left.sub!(/\[[\d]+\]/, '')
+			#puts "Left: " + left + "     Old left: " + old_left + "      j: " + j.to_s
+			right[j] = old_left + "[" + @s[old_left].last.to_s + "]"
+		end
+	end
+
+	x.idominates.each do |y|
+		search_phi_renaming y
+	end
+
+	x.instructions.each do |a|
+		a.lhs.each do |v|
+			@s[v].pop
+		end
+	end
+
+  end
+
+  private
+  def rename_vars
+ 	@vars.each do |v|
+		@c[v] = 0
+		@s[v] = []
+	end
+	search_phi_renaming(@doms[0])
+  end
 
   #Differs (113) or i#-4 from 113 or 4.
   private
@@ -175,7 +202,6 @@ class Function
 		end
 	end
 	@vars.uniq!
-	puts "Vars is #{@vars}"
 	@var_bb_def.each_value {|av| av.uniq!}
   end
 

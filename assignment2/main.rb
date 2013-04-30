@@ -1,7 +1,7 @@
 require_relative 'program'
 
 # enable logging
-$debug = true
+$debug = false
 
 p = Program.new
 p.read_program(ARGV[0])
