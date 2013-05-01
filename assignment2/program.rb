@@ -16,12 +16,16 @@ class Program
     #TODO
     #Jacob, are you sure we need this?
     @doms = []
+
+    @last_inst_id = 0
     
   end
 
   public
   def to_ssa
-  	@functions.each {|name, f| f.to_ssa}
+  	@functions.each do |name, f|
+		@last_inst_id = f.to_ssa(@last_inst_id)
+	end
   end
 
   public
@@ -91,12 +95,12 @@ class Program
 
 	phi_counter = 0
 	f.bbs[i].phi.each do |var, options|
-		if $debug
-		    puts "Adding phi node for #{var} with options #{options}"
+		if true
+		    #puts "Adding phi node for #{var} with options #{options}"
 		end
 		phi_counter += 1
 		text = ""
-		text << var << " = phi("
+		text << var.to_s << " = phi("
 		options.each_index do |i|
 			text << options[i]
 			if i != options.length - 1
@@ -104,7 +108,7 @@ class Program
 			end
 		end
 		text << ")"
-		file.print("<phi-" + var + "> " + text)
+		file.print("<phi-" + var.to_s + "> " + text)
 		if (phi_counter == f.bbs[i].phi.length) && (f.bbs[i].instructions.length == 0)
 			file.print("}\"];\n")
 		else
@@ -147,6 +151,7 @@ class Program
     i = Instruction.new(inst)
     if inst[0] == "instr"
       @instructions.push(i)
+      @last_inst_id = Integer(inst[1].chomp(':'))
     else
       @header.push(i)
     end
@@ -167,6 +172,7 @@ class Program
       if i.opcode == "method"
         @functions_info[i.operands[0]] = i.operands[1]
         f = Function.new(i.operands[0])
+	f.set_vars i.operands
         @functions.merge!((i.operands[0]) => f)
       end
     end

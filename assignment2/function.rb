@@ -25,11 +25,12 @@ class Function
   end
 
   public
-  def to_ssa
+  def to_ssa(last_id)
   	compute_df
-	set_vars_assign
-	place_phis
+  	set_var_bb_def
+	last_id = place_phis(last_id)
 	rename_vars
+	last_id
   end
 
   private
@@ -46,26 +47,28 @@ class Function
   private
   def search_phi_renaming(x)
 	x.phi.each do |left, right|
-		old_left = left.dup
-		i = @c[left]
-		left = left + "[" + i.to_s + "]"
-		@s[old_left].push i
-		@c[old_left] = i + 1
+		old_name = right[0].dup
+		i = @c[right[0]]
+		right[0] = right[0] + "$" + i.to_s
+		@s[old_name].push i
+		@c[old_name] = i + 1
 	end
 
   	x.instructions.each do |a|
 		a.rhs.each do |v|
 			a.operands.each do |operand|
-				if operand == v
-					operand = operand + "[" + @s[v].last.to_s + "]"
+				if strip_address(operand) == v
+					new_operand = strip_address operand
+					operand = new_operand + "$" + @s[v].last.to_s
 				end
 			end
 		end
 		a.lhs.each do |v|
 			i = @c[v]
 			a.operands.each do |operand|
-				if operand == v
-					operand = operand + "[" + i.to_s + "]"
+				if strip_address(operand) == v
+					new_operand = strip_address operand
+					operand = new_operand + "$" + i.to_s
 				end
 			end
 			@s[v].push i
@@ -76,17 +79,16 @@ class Function
 	x.sucs.each do |y|
 		j = which_pred(y, x)
 		y.phi.each do |left, right|
-			old_left = left.dup
-			old_left.sub!(/\[[\d]+\]/, '')
-			#puts "Left: " + left + "     Old left: " + old_left + "      j: " + j.to_s
-			right[j] = old_left + "[" + @s[old_left].last.to_s + "]"
+			right[j+1] = strip_address(right[0]) + "$" + @s[strip_address(right[0])].last.to_s
+			#puts "Index: " + @s[strip_address(right[0])].last.to_s
 		end
 	end
 
 	x.idominates.each do |y|
-		search_phi_renaming y
+		search_phi_renaming y if x != y
 	end
 
+	#Gotta pop the phis too =]
 	x.instructions.each do |a|
 		a.lhs.each do |v|
 			@s[v].pop
@@ -96,117 +98,83 @@ class Function
   end
 
   private
+  def strip_address(str)
+  	new_str = str.scan /[^#\$]+/
+	new_str[0]
+  end
+
+  private
   def rename_vars
- 	@vars.each do |v|
-		@c[v] = 0
-		@s[v] = []
+	if !@vars.empty?
+ 		@vars.each do |v|
+			@c[v] = 0
+			@s[v] = []
+		end
+	end
+	@bbs.each do |bb|
+		bb.phi.each do |left, right|
+			@c[right[0]] = 0
+			@s[right[0]] = []
+		end
 	end
 	search_phi_renaming(@doms[0])
   end
 
   #Differs (113) or i#-4 from 113 or 4.
   private
-  def is_constant(str)
-  	if (str =~ /\(/) || (str =~ /#/)
-		false
-	else
+  def is_var(str)
+  	new_str = strip_address str
+	if @vars.find_index(new_str) != nil
 		true
+	else
+		false
 	end
   end
 
   #TODO
   #Handle the unknown instructions mentioned in Instruction.rb
+  public
+  def set_vars(method_ops)
+  	for i in 2...method_ops.length
+		@vars.push method_ops[i].dup
+	end
+  end
+
   private
-  def set_vars_assign
+  def set_var_bb_def
   	@bbs.each do |bb|
 		bb.instructions.each do |inst|
 			case inst.opcode
-			when "sub", "add", "mul", "div", "mod", "cmpeq", "cmple", "cmplt"
-				if @var_bb_def[inst.id.to_s] == nil
-					@var_bb_def[inst.id.to_s] = []
-				end
-				@var_bb_def[inst.id.to_s].push bb
-				push_var inst.id.to_s, inst
-				inst.lhs.push inst.id.to_s
-				if !is_constant(inst.operands[0])
-					new_str = inst.operands[0].chomp(")")
-					new_str.sub!(/^[(]/, '')
-					push_var new_str, inst
-					inst.rhs.push new_str
-				end
-				if !is_constant(inst.operands[1])
-					new_str = inst.operands[1].chomp(")")
-					new_str.sub!(/^[(]/, '')
-					push_var new_str, inst
-					inst.rhs.push new_str
-				end
-			when "istype", "checktype", "load", "isnull", "newlist", "checknull", "lddynamic"
-				if @var_bb_def[inst.id.to_s] == nil
-					@var_bb_def[inst.id.to_s] = []
-				end
-				@var_bb_def[inst.id.to_s].push bb
-				push_var inst.id.to_s, inst
-				inst.lhs.push inst.id.to_s
-				if !is_constant(inst.operands[0])
-					new_str = inst.operands[0].chomp(")")
-					new_str.sub!(/^[(]/, '')
-					push_var new_str, inst
-					inst.rhs.push new_str
-				end
-			when "new"
-				if @var_bb_def[inst.id.to_s] == nil
-					@var_bb_def[inst.id.to_s] = []
-				end
-				@var_bb_def[inst.id.to_s].push bb
-				push_var inst.id.to_s, inst
-				inst.lhs.push inst.id.to_s
+			when "sub", "add", "mul", "div", "mod", "cmpeq", "cmple", "cmplt", "store", "checkbounds", "stdynamic"
+				inst.rhs.push strip_address(inst.operands[0]) if is_var(inst.operands[0])
+				inst.rhs.push strip_address(inst.operands[1]) if is_var(inst.operands[1])
+
+			when "istype", "checktype", "load", "isnull", "newlist", "checknull", "lddynamic", "write", "param"
+				inst.rhs.push strip_address(inst.operands[0]) if is_var(inst.operands[0])
+
 			when "move"
-				new_str = inst.operands.last.chomp(")")
-				new_str.sub!(/^[(]/, '')
-				if @var_bb_def[new_str] == nil
-					@var_bb_def[new_str] = []
+				if is_var(inst.operands.last)
+					if @var_bb_def[strip_address(inst.operands.last)] == nil
+						@var_bb_def[strip_address(inst.operands.last)] = []
+					end
+					@var_bb_def[strip_address(inst.operands.last)].push bb
+					inst.lhs.push strip_address(inst.operands.last)
 				end
-				@var_bb_def[new_str].push bb
-				push_var new_str, inst
-				inst.lhs.push new_str
-				if !is_constant(inst.operands[0])
-					new_str = inst.operands[0].chomp(")")
-					new_str.sub!(/^[(]/, '')
-					push_var new_str, inst
-					inst.rhs.push new_str
-				end
+				inst.rhs.push strip_address(inst.operands[0]) if is_var(inst.operands[0])
+
 			when "blbc", "blbs"
-				push_var inst.operands[0].to_s, inst
-				inst.rhs.push inst.operands[0].to_s
-			when "store", "checkbounds", "stdynamic"
-				if !is_constant(inst.operands[0])
-					new_str = inst.operands[0].chomp(")")
-					new_str.sub!(/^[(]/, '')
-					push_var new_str, inst
-					inst.rhs.push new_str
-				end
-				if !is_constant(inst.operands[1])
-					new_str = inst.operands[1].chomp(")")
-					new_str.sub!(/^[(]/, '')
-					push_var new_str, inst
-					inst.rhs.push new_str
-				end
-			when "write", "param"
-				if !is_constant(inst.operands[0])
-					new_str = inst.operands[0].chomp(")")
-					new_str.sub!(/^[(]/, '')
-					push_var new_str, inst
-					inst.rhs.push new_str
-				end
+				inst.rhs.push strip_address(inst.inst_str[3]) if is_var(inst.inst_str[3])
+
 			end
+			inst.rhs.uniq!
+			inst.lhs.uniq!
 		end
 	end
-	@vars.uniq!
 	@var_bb_def.each_value {|av| av.uniq!}
   end
 
   private
-  def place_phis
+  def place_phis(last_id)
   	iter_count = 0
 	has_already = {}
 	work = {}
@@ -216,10 +184,8 @@ class Function
 	end
 
 	w = []
-	#@var_bb_def.each do |v, av|
 	@vars.each do |v|
 		iter_count += 1
-		#av.each do |x|
 		if @var_bb_def[v] != nil
 			@var_bb_def[v].each do |x|
 				work[x] = iter_count
@@ -230,7 +196,8 @@ class Function
 			x = w.shift
 			x.df.each do |y|
 				if has_already[y] < iter_count
-					hash = { v => [] }
+					last_id += 1
+					hash = { last_id => [v.dup] }
 					if $debug
 					    puts "At BB #{y.id} with variable #{v}, merging #{hash} into #{y.phi}"
 					end
@@ -244,6 +211,7 @@ class Function
 			end
 		end
 	end
+	last_id
   end
 
   public

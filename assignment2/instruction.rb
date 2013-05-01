@@ -32,6 +32,9 @@ class Instruction
       info = inst[1].scan(/[^@:]+/)
       @operands.push info[0]
       @operands.push Integer(info[1])
+      for i in 2...inst.length
+      	@operands.push (inst[i].scan(/[^:]/))[0]
+      end
     when "call", "br"
       info = inst[3].scan(/[\d]+/)
       @operands.push Integer(info[0])
@@ -52,7 +55,7 @@ class Instruction
     	@operands.push inst[4]
     	@operands.push inst[5]
     when "global", "nop", "entrypc", "wrl", nil, "type"
-	puts "Do something here for #{inst}"
+	#puts "Do something here for #{inst}"
     else
     	puts "Unknown instruction detected: " + @opcode
 	#TODO
