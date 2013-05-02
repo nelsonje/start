@@ -33,7 +33,7 @@ class Instruction
       @operands.push info[0]
       @operands.push Integer(info[1])
       for i in 2...inst.length
-      	@operands.push (inst[i].scan(/[^:]/))[0]
+      	@operands.push (inst[i].scan(/[^#:]+/))[0]
       end
     when "call", "br"
       info = inst[3].scan(/[\d]+/)

@@ -51,27 +51,35 @@ class Function
 		i = @c[right[0]]
 		right[0] = right[0] + "$" + i.to_s
 		@s[old_name].push i
+		#puts "(Phi) Pushing " + i.to_s + " for " + old_name
 		@c[old_name] = i + 1
 	end
 
   	x.instructions.each do |a|
 		a.rhs.each do |v|
-			a.operands.each do |operand|
-				if strip_address(operand) == v
-					new_operand = strip_address operand
-					operand = new_operand + "$" + @s[v].last.to_s
+			if a.opcode == "move"
+				if strip_address(a.operands[0]) == v
+					new_operand = strip_address a.operands[0]
+					a.operands[0] = new_operand + "$" + @s[v].last.to_s
+				end
+			else
+				a.operands.each do |operand|
+					if strip_address(operand) == v
+						new_operand = strip_address operand
+						operand = new_operand + "$" + @s[v].last.to_s
+					end
 				end
 			end
 		end
+		#Only happens for "move" instructions
 		a.lhs.each do |v|
 			i = @c[v]
-			a.operands.each do |operand|
-				if strip_address(operand) == v
-					new_operand = strip_address operand
-					operand = new_operand + "$" + i.to_s
-				end
+			if strip_address(a.operands[1]) == v
+				new_operand = strip_address a.operands[1]
+				a.operands[1] = new_operand + "$" + i.to_s
 			end
 			@s[v].push i
+			#puts "(Normal) Pushing " + i.to_s + " for " + v
 			@c[v] = i + 1
 		end
 	end
@@ -80,7 +88,7 @@ class Function
 		j = which_pred(y, x)
 		y.phi.each do |left, right|
 			right[j+1] = strip_address(right[0]) + "$" + @s[strip_address(right[0])].last.to_s
-			#puts "Index: " + @s[strip_address(right[0])].last.to_s
+			#puts "Index: " + @s[strip_address(right[0])].last.to_s + "       Strip: " + strip_address(right[0])
 		end
 	end
 
@@ -88,11 +96,15 @@ class Function
 		search_phi_renaming y if x != y
 	end
 
-	#Gotta pop the phis too =]
 	x.instructions.each do |a|
 		a.lhs.each do |v|
-			@s[v].pop
+			@s[strip_address(v)].pop
+			#puts "(Normal) Popping " + @s[strip_address(v)].to_s + " for " + v
 		end
+	end
+	x.phi.each do |left, right|
+		@s[strip_address(right[0])].pop
+		#puts "(Phi) Popping " + @s[strip_address(right[0])].to_s + " for " + strip_address(right[0])
 	end
 
   end
@@ -111,13 +123,8 @@ class Function
 			@s[v] = []
 		end
 	end
-	@bbs.each do |bb|
-		bb.phi.each do |left, right|
-			@c[right[0]] = 0
-			@s[right[0]] = []
-		end
-	end
 	search_phi_renaming(@doms[0])
+	#p @vars
   end
 
   #Differs (113) or i#-4 from 113 or 4.
@@ -138,6 +145,7 @@ class Function
   	for i in 2...method_ops.length
 		@vars.push method_ops[i].dup
 	end
+	#p @vars
   end
 
   private
@@ -184,6 +192,7 @@ class Function
 	end
 
 	w = []
+	#p @vars
 	@vars.each do |v|
 		iter_count += 1
 		if @var_bb_def[v] != nil
@@ -198,7 +207,7 @@ class Function
 				if has_already[y] < iter_count
 					last_id += 1
 					hash = { last_id => [v.dup] }
-					if $debug
+					if false
 					    puts "At BB #{y.id} with variable #{v}, merging #{hash} into #{y.phi}"
 					end
 					y.phi.merge! hash
