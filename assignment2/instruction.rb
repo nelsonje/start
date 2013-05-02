@@ -1,5 +1,5 @@
 class Instruction
-  attr_accessor   :id, :opcode, :operands, :rhs, :lhs
+  attr_accessor   :id, :opcode, :operands, :rhs, :lhs, :ssa_mod_operands
   attr_reader     :inst_str, :nop
 
   def initialize(inst)
@@ -8,6 +8,9 @@ class Instruction
     #for the function
     @rhs = []
     @lhs = []
+    #Useful for printing after changing operands
+    @ssa_mod_operands = []
+    @old_inst_str = ""
     if inst[0] == "instr"
       @opcode = inst[2]
       @id = Integer( inst[1].chomp(':') )
@@ -65,6 +68,25 @@ class Instruction
     @inst_str = inst
   end
 
+  public
+  def fix_inst_string_ssa
+  	@old_inst_str = @inst_str.dup
+	@ssa_mod_operands.uniq!
+	#p @inst_str
+	#p @ssa_mod_operands
+	@ssa_mod_operands.each do |op_i|
+		case @opcode
+		when "blbc", "blbs", "sub", "add", "mul", "div", "mod", "cmpeq", "cmple", "cmplt", "istype", "store", "move", "checkbounds", "checktype", "lddynamic", "isnull", "load", "new", "newlist", "checknull", "write", "param", "stdynamic"
+			#puts "Replacing"
+			#p @inst_str[op_i+3]
+			#puts "By"
+			#p @operands[op_i]
+			#p op_i
+			@inst_str[op_i+3] = @operands[op_i].dup
+		end
+	end
+
+  end
 
 end
 

@@ -61,12 +61,14 @@ class Function
 				if strip_address(a.operands[0]) == v
 					new_operand = strip_address a.operands[0]
 					a.operands[0] = new_operand + "$" + @s[v].last.to_s
+					a.ssa_mod_operands.push 0
 				end
 			else
-				a.operands.each do |operand|
-					if strip_address(operand) == v
-						new_operand = strip_address operand
-						operand = new_operand + "$" + @s[v].last.to_s
+				a.operands.each_index do |op_index|
+					if strip_address(a.operands[op_index]) == v
+						new_operand = strip_address a.operands[op_index]
+						a.operands[op_index] = new_operand + "$" + @s[v].last.to_s
+						a.ssa_mod_operands.push op_index
 					end
 				end
 			end
@@ -77,6 +79,7 @@ class Function
 			if strip_address(a.operands[1]) == v
 				new_operand = strip_address a.operands[1]
 				a.operands[1] = new_operand + "$" + i.to_s
+				a.ssa_mod_operands.push 1
 			end
 			@s[v].push i
 			#puts "(Normal) Pushing " + i.to_s + " for " + v
