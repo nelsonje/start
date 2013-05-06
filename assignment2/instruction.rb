@@ -1,5 +1,5 @@
 class Instruction
-  attr_accessor   :id, :opcode, :operands, :rhs, :lhs, :ssa_mod_operands
+  attr_accessor   :id, :opcode, :operands, :rhs, :lhs, :ssa_mod_operands, :expr
   attr_reader     :inst_str, :nop
 
   def initialize(inst)
@@ -11,6 +11,8 @@ class Instruction
     #Useful for printing after changing operands
     @ssa_mod_operands = []
     @old_inst_str = ""
+    #Value number vars
+    @expr = []
     if inst[0] == "instr"
       @opcode = inst[2]
       @id = Integer( inst[1].chomp(':') )
@@ -74,6 +76,7 @@ class Instruction
 	@ssa_mod_operands.uniq!
 	#p @inst_str
 	#p @ssa_mod_operands
+	#p @operands
 	@ssa_mod_operands.each do |op_i|
 		case @opcode
 		when "blbc", "blbs", "sub", "add", "mul", "div", "mod", "cmpeq", "cmple", "cmplt", "istype", "store", "move", "checkbounds", "checktype", "lddynamic", "isnull", "load", "new", "newlist", "checknull", "write", "param", "stdynamic"

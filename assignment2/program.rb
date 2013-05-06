@@ -29,6 +29,13 @@ class Program
   end
 
   public
+  def gcse
+  	@functions.each do |name, f|
+		f.gcse
+	end
+  end
+
+  public
   def dump_info(filename)
     @functions.each do |name, f|
       this_filename = filename + "-" + f.name + "-info.txt"

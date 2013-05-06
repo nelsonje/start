@@ -11,6 +11,9 @@ class Function
     #Set of all vars
     @vars = []
 
+    #Value Numbers
+    @vn = {}
+
     #Auxiliary vars needed for SSA construction (var renaming)
     @c = {}
     @s = {}
@@ -31,6 +34,11 @@ class Function
 	last_id = place_phis(last_id)
 	rename_vars
 	last_id
+  end
+
+  public
+  def gcse
+  	dvnt(@doms[0], {})
   end
 
   private
@@ -441,4 +449,126 @@ class Function
 		compute_df_helper @doms[0]
 	end
 
+	private
+	def is_redundant_phi(phi_f, dest, bb)
+		all_equal = true
+		last_vn = @vn[phi_f[1]]
+		for i in 2...phi_f.length
+			if last_vn != @vn[phi_f[i]]
+				all_equal = false
+			end
+			last_vn = @vn[phi_f[i]]
+		end
+
+		phi = phi_f.dup
+		phi.shift
+		phi.uniq!
+
+		redundant = false
+		bb.phi.each_pair do |dest2, phi_f2|
+			if dest2 != dest
+				phi2 = phi_f2.dup
+				phi2.shift
+				phi2.uniq!
+				found = []
+				for i in 0...phi.length
+					found.push false
+					for j in 0...phi2.length
+						if phi[i] == phi2[j]
+							found[i] = true
+						end
+					end
+				end
+
+				if phi.length == phi2.length
+					different_phis = false
+					found.each do |e|
+						if e == false
+							different_phis = true
+						end
+					end
+					if !different_phis
+						redundant = true
+					end
+				end
+			end
+		end
+		all_equal || redundant
+	end
+
+	#Dominator-based value number main procedure
+	private
+	def dvnt(b, scoped_hash)
+		hash_expr_vn = scoped_hash.dup
+		to_be_deleted = []
+		b.phi.each_key do |phi_key|
+			if is_redundant_phi(b.phi[phi_key], phi_key, b)
+				@vn[b.phi[phi_key][0]] = hash_expr_vn[b.phi[phi_key]]
+				to_be_deleted.push phi_key
+			else
+				@vn[b.phi[phi_key][0]] = b.phi[phi_key][0]
+				#Shouldn't we add only the phi arguments instead of entire p?
+				new_entry = { b.phi[phi_key] => phi_key.to_s }
+				hash_expr_vn.merge! new_entry
+			end
+		end
+		to_be_deleted.each { |x| b.phi.delete x }
+		to_be_deleted = []
+		set_assignments b
+		b.instructions.each do |inst|
+			if !inst.expr.empty?
+				for i in 2...inst.expr.length
+					if @vn[inst.expr[i]] != nil
+						inst.expr[i] = @vn[inst.expr[i]] 
+						inst.operands[i-2] = @vn[inst.operands[i-2]]
+					end
+				end
+				#if expr can be simplified to expr'
+				expr_size = inst.expr.length
+				if expr_size == 4
+					tmp = hash_expr_vn[[inst.expr[1], inst.expr[2], inst.expr[3]]]
+				else
+					tmp = hash_expr_vn[[inst.expr[1], inst.expr[2]]]
+				end
+				if tmp != nil
+					@vn[inst.expr[0]] = tmp
+					to_be_deleted.push b.instructions.find_index inst
+				else
+					@vn[inst.expr[0]] = inst.expr[0]
+					new_entry = { inst.expr.dup => inst.expr[0] }
+					hash_expr_vn.merge! new_entry
+				end
+			end
+		end
+		to_be_deleted.each { |i| b.instructions.delete_at i }
+		b.sucs.each do |succ|
+			adjust_phis(succ, b)
+		end
+		b.idominates.each { |child| dvnt(child, hash_expr_vn) }
+	end
+
+	private
+	def adjust_phis(bb, pred)
+		j = which_pred(bb, pred)
+		bb.phi.each_value do |right|
+			right[j+1] = @vn[right[j+1]]
+		end
+	end
+
+
+	private
+	def set_assignments(bb)
+		bb.instructions.each do |inst|
+			case inst.opcode
+			#Treat "checkbounds" because I don't know if it assigns to anything
+			when "sub", "add", "mul", "div", "mod", "cmpeq", "cmple", "cmplt", "istype", "checkbounds", "checktype"
+				new_expr = [inst.id, inst.opcode, inst.operands[0], inst.operands[1]]
+				inst.expr = new_expr
+			when "isnull", "checknull"
+				new_expr = [inst.id, inst.opcode, inst.operands[0]]
+				inst.expr = new_expr
+			end
+		end
+	end
 end
+
