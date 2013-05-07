@@ -454,8 +454,12 @@ class Function
 		all_equal = true
 		last_vn = @vn[phi_f[1]]
 		for i in 2...phi_f.length
-			if last_vn != @vn[phi_f[i]]
+			if (last_vn == nil) || (@vn[phi_f[i]] == nil)
 				all_equal = false
+			else
+				if last_vn != @vn[phi_f[i]]
+					all_equal = false
+				end
 			end
 			last_vn = @vn[phi_f[i]]
 		end
@@ -488,6 +492,9 @@ class Function
 						end
 					end
 					if !different_phis
+						#p phi_f
+						#p "Redundant with:"
+						#p phi_f2
 						redundant = true
 					end
 				end
@@ -505,6 +512,7 @@ class Function
 			if is_redundant_phi(b.phi[phi_key], phi_key, b)
 				@vn[b.phi[phi_key][0]] = hash_expr_vn[b.phi[phi_key]]
 				to_be_deleted.push phi_key
+				#p b.phi[phi_key]
 			else
 				@vn[b.phi[phi_key][0]] = b.phi[phi_key][0]
 				#Shouldn't we add only the phi arguments instead of entire p?
@@ -512,7 +520,11 @@ class Function
 				hash_expr_vn.merge! new_entry
 			end
 		end
-		to_be_deleted.each { |x| b.phi.delete x }
+		to_be_deleted.each do |x|
+			p "Deleting"
+			p b.phi[x]
+			b.phi.delete x
+		end
 		to_be_deleted = []
 		set_assignments b
 		b.instructions.each do |inst|
@@ -540,7 +552,11 @@ class Function
 				end
 			end
 		end
-		to_be_deleted.each { |i| b.instructions.delete_at i }
+		to_be_deleted.each do |i|
+			p "Deleting regular instruction:"
+			p b.instructions[i]
+			b.instructions.delete_at i
+		end
 		b.sucs.each do |succ|
 			adjust_phis(succ, b)
 		end
@@ -551,7 +567,7 @@ class Function
 	def adjust_phis(bb, pred)
 		j = which_pred(bb, pred)
 		bb.phi.each_value do |right|
-			right[j+1] = @vn[right[j+1]]
+			right[j+1] = @vn[right[j+1]] if @vn[right[j+1]] != nil
 		end
 	end
 
@@ -562,13 +578,118 @@ class Function
 			case inst.opcode
 			#Treat "checkbounds" because I don't know if it assigns to anything
 			when "sub", "add", "mul", "div", "mod", "cmpeq", "cmple", "cmplt", "istype", "checkbounds", "checktype"
-				new_expr = [inst.id, inst.opcode, inst.operands[0], inst.operands[1]]
+				new_expr = ["("+inst.id.to_s+")", inst.opcode, inst.operands[0], inst.operands[1]]
 				inst.expr = new_expr
 			when "isnull", "checknull"
-				new_expr = [inst.id, inst.opcode, inst.operands[0]]
+				new_expr = ["("+inst.id.to_s+")", inst.opcode, inst.operands[0]]
 				inst.expr = new_expr
 			end
 		end
 	end
+
+	private
+	def is_const_scp(v)
+		return_value = true
+		return_value = false if v =~ /[#\$\(\)\[\]]/
+		return_value
+	end
+
+	private
+	def scp
+		#we should simplify everything before starting
+		w = []
+		@bbs.each do |bb|
+			bb.phi.each_key do |key|
+				w.push bb.phi[key]
+			end
+			bb.instructions.each_index do |i|
+				w.push bb.instructions[i]
+			end
+		end
+
+		while !w.empty?
+			s = w.shift
+			#Is phi?
+			if s.kind_of?(Array)
+				all_const = true
+				which_const = nil
+				for i in 1...s.length
+					if !is_const_scp(s[i])
+						all_const = false
+					else
+						if which_const == nil
+							which_const = s[i]
+						else
+							all_const = false if which_const != s[i]
+						end
+					end
+				end
+				if all_const
+					s[1] = which_const
+					s.slice!(0..1)
+				end
+			end
+
+			#Is constant phi?
+			if s.kind_of?(Array) && (s.length == 2) && (is_constant_scp(s[1]))
+				@bbs.each do |bb|
+					bb.phi.each_key do |key|
+						if bb.phi[key] == s
+							bb.phi.delete key
+						else
+							for i in 1...bb.phi[key].length
+								bb.phi[key][i] = s[1] if bb.phi[key][i] == s[0]
+							end
+							w.push bb.phi[key]
+						end
+					end
+					bb.instructions.each_index do |i|
+						changed = replace_by(bb.instructions[i], s[0], s[1])
+						if changed
+							#Only if changed because we simplified in the beginning
+							simplify bb.instructions[i]
+							w.push bb.instructions[i]
+						end
+					end
+				end
+			end
+
+			#Is constant non-phi?
+
+
+		end
+	end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 end
 
