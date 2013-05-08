@@ -129,7 +129,7 @@ class Program
 	end
 
         for inst in 0...f.bbs[i].instructions.length
-	  f.bbs[i].instructions[inst].fix_inst_string_ssa
+	  #f.bbs[i].instructions[inst].fix_inst_string_ssa
           text = ""
 	    #f.bbs[i].instructions[inst].inst_str.each {|str| text << " " << str}
 	    text << f.bbs[i].instructions[inst].codegen(self)

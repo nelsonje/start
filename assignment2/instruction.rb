@@ -64,7 +64,7 @@ class Instruction
     when "global", "nop", "entrypc", "wrl", nil, "type"
 	#puts "Do something here for #{inst}"
     else
-    	puts "Unknown instruction detected: " + inst
+    	puts "Unknown instruction detected: " + inst.join(' ')
 	#TODO
 	#Since I don't know how to exit in Ruby, divide by zero LOL
 	5/0
@@ -81,11 +81,11 @@ class Instruction
 	@ssa_mod_operands.each do |op_i|
 	  case @opcode
 	  when "blbc", "blbs", "sub", "add", "mul", "div", "mod", "cmpeq", "cmple", "cmplt", "istype", "store", "move", "checkbounds", "checktype", "lddynamic", "isnull", "load", "new", "newlist", "checknull", "write", "param", "stdynamic"
-	      #puts "Replacing"
-	      #p @inst_str[op_i+3]
-	      #puts "By"
-	      #p @operands[op_i]
-	      #p op_i
+	      puts "Replacing"
+	      p @inst_str[op_i+3]
+	      puts "By"
+	      p @operands[op_i]
+	      p op_i
 	      @inst_str[op_i+3] = @operands[op_i].dup
 	  end
       end
@@ -95,15 +95,15 @@ class Instruction
 
   def codegen(f)
       case @opcode
-      when  "method"
-	  "#{ @inst_str.join(' ') }"
-      when "type", "global"
-	  "#{@opcode} #{ @operands.join(' ') } (#{ @inst_str.join(' ') }) "
+#      when  "method"
+#	  "#{ @inst_str.join(' ') }"
       when "blbc", "blbs"
 	  # TODO doesn't quite work if these ops take constant arguments
 	  "instr #{id}: #{@opcode} (#{ @operands[0] }) [#{ @operands[1] }]" # (#{ @inst_str.join(' ') }) "
       else
-	  "instr #{id}: #{@opcode} #{ @operands.join(' ') }" # (#{ @inst_str.join(' ') })"
+	  "#{ @inst_str.join(' ') }"
+	  #"instr #{id}: #{@opcode} #{ @operands.join(' ') }" # (#{ @inst_str.join(' ') })"
+	  #"instr #{id}: #{@opcode} #{ @operands.join(' ') }" # (#{ @inst_str.join(' ') })"
       end
   end
 
