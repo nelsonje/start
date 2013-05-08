@@ -96,6 +96,12 @@ class Instruction
 			end
 		end
 	end
+	if !@expr.empty?
+		for i in 2...@expr.length
+			@operands[i-2] = @expr[i]
+			@inst_str[i+1] = @expr[i]
+		end
+	end
 
   end
 

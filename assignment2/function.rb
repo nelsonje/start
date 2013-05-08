@@ -546,15 +546,17 @@ class Function
 					end
 				end
 				#if expr can be simplified to expr'
-				expr_size = inst.expr.length
-				if expr_size == 4
+				if inst.expr.length == 4
 					tmp = hash_expr_vn[[inst.expr[1], inst.expr[2], inst.expr[3]]]
 				else
 					tmp = hash_expr_vn[[inst.expr[1], inst.expr[2]]]
 				end
 				if tmp != nil
+					#p tmp
 					@vn[inst.expr[0]] = tmp
-					to_be_deleted.push b.instructions.find_index inst
+					to_be_deleted.push b.instructions.find_index(inst)
+					p inst.inst_str
+					#p b.instructions[b.instructions.find_index(inst)].inst_str
 				else
 					@vn[inst.expr[0]] = inst.expr[0]
 					new_entry = {}
@@ -569,10 +571,40 @@ class Function
 			end
 		end
 		to_be_deleted.each do |i|
-			p "Deleting regular instruction:"
-			p b.instructions[i].inst_str
-			b.instructions.delete_at i
+			#p "Deleting regular instruction:"
+			#p b.instructions[i].inst_str
+			#p b.instructions[i].expr
+			@bbs.each do |bb|
+				bb.instructions.each_index do |j|
+					if bb.instructions[j] != nil
+						case bb.instructions[j].opcode
+						when "blbc", "blbs"
+							if bb.instructions[j].inst_str[3] == b.instructions[i].expr[0]
+								dest = @vn[b.instructions[i].expr[0]].scan(/[\d]+/)
+								bb.instructions[j].operands[0] = Integer(dest[0])
+								bb.instructions[j].inst_str[3] = @vn[b.instructions[i].expr[0]]
+							end
+						when "istype", "checktype", "lddynamic", "isnull", "load", "checknull", "write", "param"
+							if bb.instructions[j].inst_str[3] == b.instructions[i].expr[0]
+								bb.instructions[j].operands[0] = @vn[b.instructions[i].expr[0]]
+								bb.instructions[j].inst_str[3] = @vn[b.instructions[i].expr[0]]
+							end
+						when "store", "move", "checkbounds"
+							if bb.instructions[j].inst_str[3] == b.instructions[i].expr[0]
+								bb.instructions[j].operands[0] = @vn[b.instructions[i].expr[0]]
+								bb.instructions[j].inst_str[3] = @vn[b.instructions[i].expr[0]]
+							end
+							if bb.instructions[j].inst_str[4] == b.instructions[i].expr[0]
+								bb.instructions[j].operands[1] = @vn[b.instructions[i].expr[0]]
+								bb.instructions[j].inst_str[4] = @vn[b.instructions[i].expr[0]]
+							end
+						end
+					end
+				end
+			end
+			b.instructions[i] = nil
 		end
+		b.instructions.delete(nil)
 		b.sucs.each do |succ|
 			adjust_phis(succ, b)
 		end
@@ -593,12 +625,11 @@ class Function
 		bb.instructions.each do |inst|
 			case inst.opcode
 			#Treat "checkbounds" because I don't know if it assigns to anything
-			when "sub", "add", "mul", "div", "mod", "cmpeq", "cmple", "cmplt", "istype", "checkbounds", "checktype"
+			when "sub", "add", "mul", "div", "mod", "cmpeq", "cmple", "cmplt"
 				new_expr = ["("+inst.id.to_s+")", inst.opcode, inst.operands[0], inst.operands[1]]
 				inst.expr = new_expr
-			when "isnull", "checknull"
-				new_expr = ["("+inst.id.to_s+")", inst.opcode, inst.operands[0]]
-				inst.expr = new_expr
+			else
+				inst.expr = []
 			end
 		end
 	end
