@@ -51,7 +51,7 @@ graphical representation using the \texttt{dot} program.
 
 \section{Running}
 
-The optimizer may be run by executing the \texttt{assignment2/run.rb}
+The optimizer may be run by executing the \texttt{assignment2/run.sh}
 script while inside the \texttt{assignment2} directory. We have
 included precompiled intermediate languages files for all examples in
 the distribution. Running the script will create separate output files
@@ -63,8 +63,14 @@ IL for \texttt{gdc.dart} can be found in
 \texttt{examples/gcd.dart.ilo}. The GraphViz files can be turned into
 PDF with a command like \texttt{dot -Tpdf file.dot > file.pdf}.
 
+The script mostly follows the interface described in the assignment;
+optimizations are selected by specifying a comma-separated list to the
+\texttt{-opt=} flag, and similarily backends with the
+\texttt{-backend=} flag. We write output to files as specified above
+instead of stdout, since there is often a lot of output.
+
 Our optimizer is implemented in Ruby, so no separate build step is
-required. Ruby version 1.9 is required.
+required. Ruby version 1.9 is required. 
 
 \section{SSA discussion}
 
