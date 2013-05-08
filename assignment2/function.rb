@@ -848,10 +848,11 @@ class Function
 	public
 	def write_il(file)
 	    write_il_helper file, @doms[0]
+	end
 
 	######################################### GCSE ###########################################
 
-	private
+	    private
 	def is_redundant_phi(phi_f, dest, bb)
 		all_equal = true
 		last_vn = @vn[phi_f[1]]
@@ -1257,5 +1258,7 @@ class Function
 			result = Integer(strip_offset(s.operands[0])) < Integer(strip_offset(s.operands[1]))
 		end
 	end
-end
+    end
+
+
 
