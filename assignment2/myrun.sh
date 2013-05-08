@@ -1,3 +1,5 @@
+echo const
+/usr/local/bin/ruby main.rb ../examples/const.dart.il
 echo class
 /usr/local/bin/ruby main.rb ../examples/class.dart.il
 echo gcd
@@ -14,8 +16,8 @@ echo points
 /usr/local/bin/ruby main.rb ../examples/points.dart.il
 echo prime
 /usr/local/bin/ruby main.rb ../examples/prime.dart.il
-echo regslarge
-/usr/local/bin/ruby main.rb ../examples/regslarge.dart.il
+echo MYregslarge
+/usr/local/bin/ruby main.rb ../examples/myregslarge.dart.il
 echo sieve
 /usr/local/bin/ruby main.rb ../examples/sieve.dart.il
 echo sort

@@ -7,6 +7,7 @@ class BasicBlock
     @instructions = []
     for i in first..last
       @instructions.push insts[i]
+      insts[i].bb = self
     end
     @visited = :unvisited
     @dom_processed = false

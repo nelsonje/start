@@ -13,6 +13,9 @@ class Function
     #Set of all vars
     @vars = []
 
+    #Value Numbers
+    @vn = {}
+
     #Auxiliary vars needed for SSA construction (var renaming)
     @c = {}
     @s = {}
@@ -52,6 +55,18 @@ class Function
 	rename_vars
       @new_instruction_index = last_id + 1
 	last_id
+  end
+
+  public
+  def gcse
+  	@bbs.each do |bb|
+		bb.phi.each_value do |right|
+			for i in 0...right.length
+				@vn[right[i]] = right[i]
+			end
+		end
+	end
+  	dvnt(@doms[0], {})
   end
 
   private
@@ -833,5 +848,414 @@ class Function
 	public
 	def write_il(file)
 	    write_il_helper file, @doms[0]
+
+	######################################### GCSE ###########################################
+
+	private
+	def is_redundant_phi(phi_f, dest, bb)
+		all_equal = true
+		last_vn = @vn[phi_f[1]]
+		for i in 2...phi_f.length
+			if (last_vn == nil) || (@vn[phi_f[i]] == nil)
+				all_equal = false
+			else
+				if last_vn != @vn[phi_f[i]]
+					all_equal = false
+				end
+			end
+			last_vn = @vn[phi_f[i]]
+		end
+
+		phi = phi_f.dup
+		phi.shift
+		phi.uniq!
+
+		redundant = false
+		bb.phi.each_pair do |dest2, phi_f2|
+			if dest2 != dest
+				phi2 = phi_f2.dup
+				phi2.shift
+				phi2.uniq!
+				found = []
+				for i in 0...phi.length
+					found.push false
+					for j in 0...phi2.length
+						if phi[i] == phi2[j]
+							found[i] = true
+						end
+					end
+				end
+
+				if phi.length == phi2.length
+					different_phis = false
+					found.each do |e|
+						if e == false
+							different_phis = true
+						end
+					end
+					if !different_phis
+						#p phi_f
+						#p "Redundant with:"
+						#p phi_f2
+						redundant = true
+					end
+				end
+			end
+		end
+		all_equal || redundant
+	end
+
+	#Dominator-based value number main procedure
+	private
+	def dvnt(b, scoped_hash)
+		hash_expr_vn = scoped_hash.dup
+		to_be_deleted = []
+		b.phi.each_key do |phi_key|
+			if is_redundant_phi(b.phi[phi_key], phi_key, b)
+				@vn[b.phi[phi_key][0]] = hash_expr_vn[b.phi[phi_key]]
+				to_be_deleted.push phi_key
+				#p b.phi[phi_key]
+			else
+				@vn[b.phi[phi_key][0]] = b.phi[phi_key][0]
+				#Shouldn't we add only the phi arguments instead of entire p?
+				#Maybe I shoud use i$0 as the value of the hash, not the key
+				new_entry = { b.phi[phi_key] => b.phi[phi_key][0] }
+				hash_expr_vn.merge! new_entry
+			end
+		end
+		to_be_deleted.each do |x|
+			p "Deleting"
+			p b.phi[x]
+			b.phi.delete x
+		end
+		to_be_deleted = []
+		set_assignments b
+		b.instructions.each do |inst|
+			if !inst.expr.empty?
+				for i in 2...inst.expr.length
+					if @vn[inst.expr[i]] != nil
+						inst.expr[i] = @vn[inst.expr[i]] 
+						inst.operands[i-2] = @vn[inst.operands[i-2]]
+					end
+				end
+				#if expr can be simplified to expr'
+				if inst.expr.length == 4
+					tmp = hash_expr_vn[[inst.expr[1], inst.expr[2], inst.expr[3]]]
+				else
+					tmp = hash_expr_vn[[inst.expr[1], inst.expr[2]]]
+				end
+				if tmp != nil
+					#p tmp
+					@vn[inst.expr[0]] = tmp
+					to_be_deleted.push b.instructions.find_index(inst)
+					p inst.inst_str
+					#p b.instructions[b.instructions.find_index(inst)].inst_str
+				else
+					@vn[inst.expr[0]] = inst.expr[0]
+					new_entry = {}
+					if inst.expr.length == 4
+						new_entry = { [inst.expr[1], inst.expr[2], inst.expr[3]] => inst.expr[0] }
+					else
+						new_entry = { [inst.expr[1], inst.expr[2]] => inst.expr[0] }
+					end
+					hash_expr_vn.merge! new_entry
+					#p hash_expr_vn
+				end
+			end
+		end
+		to_be_deleted.each do |i|
+			#p "Deleting regular instruction:"
+			#p b.instructions[i].inst_str
+			#p b.instructions[i].expr
+			@bbs.each do |bb|
+				bb.instructions.each_index do |j|
+					if bb.instructions[j] != nil
+						case bb.instructions[j].opcode
+						when "blbc", "blbs"
+							if bb.instructions[j].inst_str[3] == b.instructions[i].expr[0]
+								dest = @vn[b.instructions[i].expr[0]].scan(/[\d]+/)
+								bb.instructions[j].operands[0] = Integer(dest[0])
+								bb.instructions[j].inst_str[3] = @vn[b.instructions[i].expr[0]]
+							end
+						when "istype", "checktype", "lddynamic", "isnull", "load", "checknull", "write", "param"
+							if bb.instructions[j].inst_str[3] == b.instructions[i].expr[0]
+								bb.instructions[j].operands[0] = @vn[b.instructions[i].expr[0]]
+								bb.instructions[j].inst_str[3] = @vn[b.instructions[i].expr[0]]
+							end
+						when "store", "move", "checkbounds"
+							if bb.instructions[j].inst_str[3] == b.instructions[i].expr[0]
+								bb.instructions[j].operands[0] = @vn[b.instructions[i].expr[0]]
+								bb.instructions[j].inst_str[3] = @vn[b.instructions[i].expr[0]]
+							end
+							if bb.instructions[j].inst_str[4] == b.instructions[i].expr[0]
+								bb.instructions[j].operands[1] = @vn[b.instructions[i].expr[0]]
+								bb.instructions[j].inst_str[4] = @vn[b.instructions[i].expr[0]]
+							end
+						end
+					end
+				end
+			end
+			b.instructions[i] = nil
+		end
+		b.instructions.delete(nil)
+		b.sucs.each do |succ|
+			adjust_phis(succ, b)
+		end
+		b.idominates.each { |child| dvnt(child, hash_expr_vn) }
+	end
+
+	private
+	def adjust_phis(bb, pred)
+		j = which_pred(bb, pred)
+		bb.phi.each_value do |right|
+			right[j+1] = @vn[right[j+1]] if @vn[right[j+1]] != nil
+		end
+	end
+
+
+	private
+	def set_assignments(bb)
+		bb.instructions.each do |inst|
+			case inst.opcode
+			#Treat "checkbounds" because I don't know if it assigns to anything
+			when "sub", "add", "mul", "div", "mod", "cmpeq", "cmple", "cmplt"
+				new_expr = ["("+inst.id.to_s+")", inst.opcode, inst.operands[0], inst.operands[1]]
+				inst.expr = new_expr
+			else
+				inst.expr = []
+			end
+		end
+	end
+
+	####################################### SCP ######################################################
+
+	private
+	def is_const_scp(v)
+		return_value = true
+		return_value = false if (v =~ /[\$\(\)\[\]]/) || ((v =~ /[a-zA-Z]/) && !(v =~ /[\$]/))
+		return_value = true if (v =~ /offset/) && (v =~ /[\?]/)
+		return_value
+	end
+
+	public
+	def scp
+		w = []
+		@bbs.each do |bb|
+			bb.phi.each_key do |key|
+				w.push bb.phi[key]
+			end
+			bb.instructions.each_index do |i|
+				w.push bb.instructions[i]
+			end
+		end
+
+		while !w.empty?
+			s = w.shift
+			#Is phi?
+			if s.kind_of?(Array)
+				all_const = true
+				which_const = nil
+				for i in 1...s.length
+					if !is_const_scp(s[i])
+						all_const = false
+					else
+						if which_const == nil
+							which_const = s[i]
+						else
+							all_const = false if which_const != s[i]
+						end
+					end
+				end
+				if all_const
+					s[1] = which_const.to_s
+					s.slice!(0..1)
+				end
+			end
+
+			#Is constant phi?
+			if s.kind_of?(Array) && (s.length == 2) && (is_const_scp(s[1]))
+				@bbs.each do |bb|
+					bb.phi.each_key do |key|
+						if bb.phi[key] == s
+							bb.phi.delete key
+						else
+							for i in 1...bb.phi[key].length
+								bb.phi[key][i] = s[1] if bb.phi[key][i] == s[0]
+							end
+							w.push bb.phi[key]
+						end
+					end
+					bb.instructions.each_index do |i|
+						changed = replace_by(bb.instructions[i], s[0], s[1])
+						w.push bb.instructions[i] if changed
+					end
+				end
+			end
+
+			#Is constant non-phi?
+			if !s.kind_of?(Array) && is_const_inst(s)
+				case s.opcode
+				when "move"
+					op1 = nil
+					op0 = nil
+					if s.operands[1].instance_of? Fixnum
+						op1 = s.operands[1]
+					else
+						op1 = s.operands[1].dup
+					end
+					if s.operands[0].instance_of? Fixnum
+						op0 = s.operands[0]
+					else
+						op0 = s.operands[0].dup
+					end
+					@bbs.each do |bb|
+						to_be_deleted = []
+						bb.instructions.each_index do |i|
+							if bb.instructions[i] == s
+								to_be_deleted.push i
+							else
+								changed = replace_by(bb.instructions[i], op1, op0)
+								w.push bb.instructions[i]
+							end
+						end
+						to_be_deleted.each do |i|
+							bb.preds.each do |pred|
+								last = pred.instructions.last
+								case last.opcode
+								when "call", "br"
+									if last.operands[0] == bb.instructions[i].id
+										last.operands[0] += 1
+										last.inst_str[3] = "[" + last.operands[0].to_s + "]"
+									end
+								when "blbc", "blbs"
+									if last.operands[1] == bb.instructions[i].id
+										last.operands[1] += 1
+										last.inst_str[4] = "[" + last.operands[1].to_s + "]"
+									end
+								end
+							end
+							bb.instructions.delete_at i
+						end
+						bb.phi.each_key do |key|
+							for i in 1...bb.phi[key].length
+								bb.phi[key][i] = op0.to_s if bb.phi[key][i] == op1
+								w.push bb.phi[key]
+							end
+						end
+					end
+				else
+					if (s.opcode != "blbc") && (s.opcode != "blbs")
+						target = "(" + s.id.to_s + ")"
+						result = eval_expr s
+						@bbs.each do |bb|
+							to_be_deleted = []
+							bb.instructions.each_index do |i|
+								if bb.instructions[i] == s
+									to_be_deleted.push i
+								else
+									changed = replace_by(bb.instructions[i], target, result)
+									w.push bb.instructions[i]
+								end
+							end
+							to_be_deleted.each do |i|
+								bb.preds.each do |pred|
+									last = pred.instructions.last
+									case last.opcode
+									when "call", "br"
+										if last.operands[0] == bb.instructions[i].id
+											last.operands[0] += 1
+											last.inst_str[3] = "[" + last.operands[0].to_s + "]"
+										end
+									when "blbc", "blbs"
+										if last.operands[1] == bb.instructions[i].id
+											last.operands[1] += 1
+											last.inst_str[4] = "[" + last.operands[1].to_s + "]"
+										end
+								end
+							end
+							bb.instructions.delete_at i
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+
+	private
+	def replace_by(inst, from, to)
+		changed = false
+		if ((inst.opcode == "blbc") || (inst.opcode == "blbs")) && (inst.bl_operand == from)
+			inst.bl_operand = to.to_s
+			inst.operands[0] = to.to_s
+			inst.inst_str[3] = to.to_s
+			changed = true
+		end
+		case inst.opcode
+		when "sub", "add", "mul", "div", "mod", "cmpeq", "cmple", "cmplt", "stdynamic"
+			if inst.operands[0] == from
+				inst.operands[0] = to
+				inst.inst_str[3] = to.to_s
+				changed = true
+			end
+			if inst.operands[1] == from
+				inst.operands[1] = to
+				inst.inst_str[4] = to.to_s
+				changed = true
+			end
+		when "store", "move", "istype", "checkbounds", "checktype", "isnull", "checknull", "write", "param", "load", "lddynamic"
+			if inst.operands[0] == from
+				inst.operands[0] = to
+				inst.inst_str[3] = to.to_s
+				changed = true
+			end
+		end
+		changed
+	end
+
+	private
+	def is_const_inst(s)
+		ret_val = false
+		case s.opcode
+		when "sub", "add", "mul", "div", "mod", "cmpeq", "cmple", "cmplt"
+			ret_val = true if is_const_scp(s.operands[0]) && is_const_scp(s.operands[1])
+		when "move"
+			ret_val = true if is_const_scp(s.operands[0])
+		when "blbc", "blbs"
+			ret_val = true if is_const_scp(s.bl_operand)
+		end
+		ret_val
+	end
+
+	private
+	def strip_offset(s)
+		if (s =~ /[o][f][f][s][e][t]/) && !(s =~ /[\?]/)
+			s.slice!(/[^#]+#/)
+			p s
+		end
+		s
+	end
+
+	private
+	def eval_expr(s)
+		case s.opcode
+		when "sub"
+			result = Integer(strip_offset(s.operands[0])) - Integer(strip_offset(s.operands[1]))
+		when "add"
+			result = Integer(strip_offset(s.operands[0])) + Integer(strip_offset(s.operands[1]))
+		when "mul"
+			result = Integer(strip_offset(s.operands[0])) * Integer(strip_offset(s.operands[1]))
+		when "div"
+			result = Integer(strip_offset(s.operands[0])) / Integer(strip_offset(s.operands[1]))
+		when "mod"
+			result = Integer(strip_offset(s.operands[0])) % Integer(strip_offset(s.operands[1]))
+		when "cmpeq"
+			result = Integer(strip_offset(s.operands[0])) == Integer(strip_offset(s.operands[1]))
+		when "cmple"
+			result = Integer(strip_offset(s.operands[0])) <= Integer(strip_offset(s.operands[1]))
+		when "cmplt"
+			result = Integer(strip_offset(s.operands[0])) < Integer(strip_offset(s.operands[1]))
+		end
 	end
 end
+

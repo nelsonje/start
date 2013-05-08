@@ -30,6 +30,20 @@ class Program
   end
 
   public
+  def gcse
+  	@functions.each do |name, f|
+		f.gcse
+	end
+  end
+
+  public
+  def scp
+  	@functions.each do |name, f|
+		f.scp
+	end
+  end
+
+  public
   def dump_info(filename)
     @functions.each do |name, f|
       this_filename = filename + "-" + f.name + "-info.txt"
@@ -133,6 +147,7 @@ class Program
 	  #f.bbs[i].instructions[inst].fix_inst_string_ssa
           text = ""
 	    #f.bbs[i].instructions[inst].inst_str.each {|str| text << " " << str}
+	    #f.bbs[i].instructions[inst].inst_str.each {|str| text << " " << str.to_s}
 	    text << f.bbs[i].instructions[inst].codegen(self)
           file.print("<c" + inst.to_s + "> " + text)
           if inst == (f.bbs[i].instructions.length - 1)

@@ -1,8 +1,8 @@
 require_relative 'program'
 
 ssa_enabled = true
-cse_enabled = true
-scp_enabled = true
+cse_enabled = false
+scp_enabled = false
 
 cfg_enabled = true
 ir_enabled = true
@@ -69,12 +69,12 @@ p.build_cfgs
 
 p.build_doms
 
-p.dump_info ARGV[0] if report_enabled
+#p.dump_info ARGV[0] if report_enabled
 
 p.to_ssa if ssa_enabled
 
-
-
+p.scp if scp_enabled
+p.gcse if cse_enabled
 
 p.from_ssa if bssa_enabled
 

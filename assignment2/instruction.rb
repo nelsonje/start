@@ -1,5 +1,5 @@
 class Instruction
-  attr_accessor   :id, :opcode, :operands, :rhs, :lhs, :ssa_mod_operands, :pre_ssa_id, :post_ssa_id
+  attr_accessor   :id, :opcode, :operands, :rhs, :lhs, :ssa_mod_operands, :expr, :bb, :bl_operand, :pre_ssa_id, :post_ssa_id
   attr_reader     :inst_str, :nop
 
   def initialize(inst)
@@ -11,6 +11,8 @@ class Instruction
     #Useful for printing after changing operands
     @ssa_mod_operands = []
     @old_inst_str = ""
+    #Value number vars
+    @expr = []
     if inst[0] == "instr"
       @opcode = inst[2]
       @id = Integer( inst[1].chomp(':') )
@@ -24,6 +26,9 @@ class Instruction
       @id = -1
     end
     @operands = []
+    #BB to which this inst belongs
+    @bb
+    @bl_operand
 
       @pre_ssa_id = id
       @post_ssa_id = -1
@@ -48,6 +53,7 @@ class Instruction
     when "blbc", "blbs"
       info = inst[3].scan(/[\d]+/)
       @operands.push Integer(info[0])
+      @bl_operand = inst[3]
       info = inst[4].scan(/[\d]+/)
       @operands.push Integer(info[0])
     when "ret", "enter"
@@ -74,24 +80,33 @@ class Instruction
 
   public
   def fix_inst_string_ssa
-  	@old_inst_str = @inst_str.dup
-	@ssa_mod_operands.uniq!
-	#p @inst_str
-	#p @ssa_mod_operands
-	@ssa_mod_operands.each do |op_i|
+      @old_inst_str = @inst_str.dup
+      @ssa_mod_operands.uniq!
+      #p @inst_str
+      #p @ssa_mod_operands
+      #p @operands
+      @ssa_mod_operands.each do |op_i|
 	  case @opcode
 	  when "blbc", "blbs", "sub", "add", "mul", "div", "mod", "cmpeq", "cmple", "cmplt", "istype", "store", "move", "checkbounds", "checktype", "lddynamic", "isnull", "load", "new", "newlist", "checknull", "write", "param", "stdynamic"
-	      # puts "Replacing"
-	      # p @inst_str[op_i+3]
-	      # puts "By"
-	      # p @operands[op_i]
-	      # p op_i
-	      @inst_str[op_i+3] = @operands[op_i].dup
+	      #puts "Replacing"
+	      #p @inst_str[op_i+3]
+	      #puts "By"
+	      #p @operands[op_i]
+	      #p op_i
+	      if @operands[op_i].instance_of? Fixnum
+		  @inst_str[op_i+3] = @operands[op_i]
+	      else
+		  @inst_str[op_i+3] = @operands[op_i].dup
+	      end
 	  end
       end
-      
+      if !@expr.empty?
+	  for i in 2...@expr.length
+	      @operands[i-2] = @expr[i]
+	      @inst_str[i+1] = @expr[i]
+	  end
+      end
   end
-
 
   def codegen(f)
       case @opcode
