@@ -291,7 +291,7 @@ class Program
   end
 
   def codegen(filename)
-      this_filename = filename + "-opt.il"
+      this_filename = filename + "o"
       file = File.new(this_filename, "w")
 
       @header.each do |i|

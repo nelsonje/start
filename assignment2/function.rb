@@ -698,8 +698,23 @@ class Function
 				    #puts "Checking for #{ins.operands[i]} = #{@symbol_table[ ins.operands[i] ]}"
 		    	    	    old_reg = @symbol_table[ var ]
 				    new_reg = old_reg
-				    if old_reg.is_a?(String) and old_reg.include?("(")
-					new_reg = "(" + @instruction_map[ old_reg.sub('(','').sub(')','').to_i ].to_s + ")"
+				    done = false
+				    while not done
+					#puts "at #{new_reg}"
+					if new_reg.is_a?(String) 
+					    if new_reg.include?("(")
+						new_reg = "(" + @instruction_map[ new_reg.sub('(','').sub(')','').to_i ].to_s + ")"
+						done = true
+					    elsif new_reg.is_a?(String) and new_reg.include?("$") and new_reg.include?("#")
+						done = true
+					    else
+						hmm = @symbol_table[ new_reg ]
+						#puts "at #{new_reg} next #{hmm}"
+						new_reg = hmm
+					    end
+					else
+					    done = true
+					end
 				    end
 		    	    	    #puts "processing ssa use #{ins.opcode} #{ins.operands.join(' ')} with var #{var} old_reg #{old_reg} new_reg #{new_reg}"
 		    	    	    ins.operands[i] = new_reg
