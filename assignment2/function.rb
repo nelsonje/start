@@ -1,5 +1,6 @@
 class Function
   attr_accessor :bbs, :name, :inst_str
+  attr_reader   :n_cprop, :n_expr_eliminated
   def initialize(name, inststr, initial_offset, header)
     @name = name
       @method_header = header
@@ -12,6 +13,9 @@ class Function
     @var_bb_def = {}
     #Set of all vars
     @vars = []
+
+    @n_expr_eliminated = 0
+    @n_cprop = 0
 
     #Value Numbers
     @vn = {}
@@ -915,18 +919,14 @@ class Function
 			if is_redundant_phi(b.phi[phi_key], phi_key, b)
 				@vn[b.phi[phi_key][0]] = hash_expr_vn[b.phi[phi_key]]
 				to_be_deleted.push phi_key
-				#p b.phi[phi_key]
 			else
 				@vn[b.phi[phi_key][0]] = b.phi[phi_key][0]
-				#Shouldn't we add only the phi arguments instead of entire p?
-				#Maybe I shoud use i$0 as the value of the hash, not the key
 				new_entry = { b.phi[phi_key] => b.phi[phi_key][0] }
 				hash_expr_vn.merge! new_entry
 			end
 		end
 		to_be_deleted.each do |x|
-			p "Deleting"
-			p b.phi[x]
+			@n_expr_eliminated += 1
 			b.phi.delete x
 		end
 		to_be_deleted = []
@@ -939,18 +939,14 @@ class Function
 						inst.operands[i-2] = @vn[inst.operands[i-2]]
 					end
 				end
-				#if expr can be simplified to expr'
 				if inst.expr.length == 4
 					tmp = hash_expr_vn[[inst.expr[1], inst.expr[2], inst.expr[3]]]
 				else
 					tmp = hash_expr_vn[[inst.expr[1], inst.expr[2]]]
 				end
 				if tmp != nil
-					#p tmp
 					@vn[inst.expr[0]] = tmp
 					to_be_deleted.push b.instructions.find_index(inst)
-					p inst.inst_str
-					#p b.instructions[b.instructions.find_index(inst)].inst_str
 				else
 					@vn[inst.expr[0]] = inst.expr[0]
 					new_entry = {}
@@ -960,14 +956,10 @@ class Function
 						new_entry = { [inst.expr[1], inst.expr[2]] => inst.expr[0] }
 					end
 					hash_expr_vn.merge! new_entry
-					#p hash_expr_vn
 				end
 			end
 		end
 		to_be_deleted.each do |i|
-			#p "Deleting regular instruction:"
-			#p b.instructions[i].inst_str
-			#p b.instructions[i].expr
 			@bbs.each do |bb|
 				bb.instructions.each_index do |j|
 					if bb.instructions[j] != nil
@@ -996,6 +988,7 @@ class Function
 					end
 				end
 			end
+			@n_expr_eliminated += 1
 			b.instructions[i] = nil
 		end
 		b.instructions.delete(nil)
@@ -1075,6 +1068,7 @@ class Function
 
 			#Is constant phi?
 			if s.kind_of?(Array) && (s.length == 2) && (is_const_scp(s[1]))
+				@n_cprop += 1
 				@bbs.each do |bb|
 					bb.phi.each_key do |key|
 						if bb.phi[key] == s
@@ -1095,6 +1089,7 @@ class Function
 
 			#Is constant non-phi?
 			if !s.kind_of?(Array) && is_const_inst(s)
+				@n_cprop += 1
 				case s.opcode
 				when "move"
 					op1 = nil

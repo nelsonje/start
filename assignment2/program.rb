@@ -84,6 +84,22 @@ class Program
   end
 
   public
+  def report_gen_scp
+  	@functions.each do |name, f|
+		puts "Function: " + name
+		puts "Number of constants propagated: " + f.n_cprop
+	end
+  end
+
+  public
+  def report_gen_gcse
+  	@functions.each do |name, f|
+		puts "Function: " + name
+		puts "Number of expressions eliminated: " + f.n_expr_eliminated
+	end
+  end
+
+  public
   def dump_cfgs(filename)
     index = 0
     @functions.each do |name, f|
