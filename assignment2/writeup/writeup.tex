@@ -30,7 +30,7 @@ class, using dominance frontiers to place phi functions.
 We implemented simple constant propagation.
 
 \paragraph{Global Common Subexpression Elimination} 
-We implemented Value Numbering.
+We implemented Value Numbering using the dominator-based algorithm.
 
 \paragraph{Conversion from SSA} 
 We use a naive approach, replacing phi functions with reads and writes
@@ -262,9 +262,9 @@ instructions were eliminated.
 \end{center}
 \end{figure*}
 
-\section{Conclusion}
+%\section{Conclusion}
 
-We implemented a number of optimizations leveraging SSA representation.
+%We implemented a number of optimizations leveraging SSA representation.
 
 \bibliographystyle{abbrv}
 \bibliography{writeup}
