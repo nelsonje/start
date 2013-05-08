@@ -702,15 +702,18 @@ class Function
 				    while not done
 					#puts "at #{new_reg}"
 					if new_reg.is_a?(String) 
+					    #puts "at #{new_reg} string"
 					    if new_reg.include?("(")
 						new_reg = "(" + @instruction_map[ new_reg.sub('(','').sub(')','').to_i ].to_s + ")"
 						done = true
 					    elsif new_reg.is_a?(String) and new_reg.include?("$") and new_reg.include?("#")
 						done = true
-					    else
+					    elsif new_reg.is_a?(String) and new_reg.include?("$") and not new_reg.include?("#")
 						hmm = @symbol_table[ new_reg ]
 						#puts "at #{new_reg} next #{hmm}"
 						new_reg = hmm
+					    else
+						done = true
 					    end
 					else
 					    done = true
@@ -759,6 +762,7 @@ class Function
 	    initial_vars.each do |v|
 		# insert ssa initial mapping
 		@symbol_table[ strip_address(v) + '$' ] = v.split(':')[0]
+		@symbol_table[ strip_address(v) + '$0' ] = v.split(':')[0]
 	    end
 
 	    # turn phi nodes into variable reads/writes
