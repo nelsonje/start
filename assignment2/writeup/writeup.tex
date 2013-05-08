@@ -181,6 +181,32 @@ conditional constant propagation; neither did we remove dead code from
 branches that were killed by constant
 propagation.
 
+The algorithm used pushes all the instructions into a work list. While
+this list is not empty, we remove one instruction S from the list and check
+whether it is either a phi function with all the arguments equal to
+some constant \emph{c}, or a regular instruction whose result can be computed
+statically. In both cases we remove such instruction from the program and
+propagate its result to all the instructions that use the result of the deleted
+instruction. All the instructions that receive the propagated constant is
+added to the work list again.
+
+Figure~\ref{fig:regslarge-nothing} shows one simple code example. Similar instructions
+in sequence were grouped together to ease visualization. Notice that
+instructions 9 to 34 perform the same operation and then instructions 35 to 59 simply
+accumulate the result of each instruction from 9 to 34. Notice also that the variables
+added by instructions 9 to 34 can be determined statically: \texttt{b\$0} comes from
+instruction 5 and \texttt{c\$0} comes from instruction 6.
+
+The result of applying constant propagation to this example is shown in Figure~\ref{fig:regslarge-scp}.
+Now, instructions 10 to 34 were eliminated as they compute the same value computed by instruction 9.
+Then, each add used to accumulate the results from instructions 9 to 34 now uses the result of instruction 9.
+Next, notice that, in Figure~\ref{fig:regslarge-nothing}, instructions 63 to 88 do the same
+that instructions 9 to 34 did. Since this result was already calculated by instruction 9, instructions 63 to 88
+are completely eliminated after constant propagation (Figure~\ref{fig:regslarge-scp}. In addition, as instructions
+89 to 113 do the same that instructions 35 to 59 did (i.e. accumulate the result os instructions 89 to 113, which calculate the same value calculated
+by instructions 9 to 34,) they are also removed and the result is simply replaced by the value already
+calculated by instruction 59.
+
 
 \begin{figure*}
 \begin{center}
