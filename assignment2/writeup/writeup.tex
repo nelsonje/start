@@ -237,10 +237,20 @@ calculated by instruction 59.
 
 We implemented value numbering for a mostly-arithmetic subset of the
 Start instruction set. Many of the other instructions had the
-potential of performing complicated and perhapse side-effectful
+potential of performing complicated and perhaps side-effectful
 operations in memory, and while we could possibly reason about
 situations where optimizations could be safe we chose to keep things
 simple.
+
+Figure~\ref{fig:regslarge-gce} shows the result of applying global common
+subexpression elimination to the example in Figure~\ref{fig:regslarge-nothing}.
+As discussed in the previous section, instructions 9 to 34 and 64 to 87 perform exactly
+the same operation over and over again. Also, instructions 35 to 59 and 89 to 113 simply
+accumulate the results of instructions 9 to 34 and 64 to 87, respectively. Since all
+these operations start with values that can be determined statically, value numbering
+detects the common subexpressions and calculate their values. The final value is simply
+used directly by instruction 60 in Figure~\ref{fig:regslarge-gce} and all the aforementioned
+instructions were eliminated.
 
 \begin{figure*}
 \begin{center}
