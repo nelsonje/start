@@ -9,6 +9,7 @@ class Program
     
     # maps name of function to index of first instruction
     @functions_info = {}
+    @orig_functions_index = {}
     
     # maps name of function to function object
     @functions = {}
@@ -188,9 +189,16 @@ class Program
     for i in @header
       if i.opcode == "method"
         @functions_info[i.operands[0]] = i.operands[1]
+        @orig_functions_index[i.operands[1]] = i.operands[0]
 	  # get offset of last operand
-	  initial_offset = i.inst_str[-1].split("#")[1].split(":")[0].to_i
-	  puts "instruction #{i.inst_str} operands #{i.operands} initial_offset #{initial_offset}"
+	  initial_offset = 0
+	  if i.inst_str.size > 2
+	      initial_offset = i.inst_str[-1].split("#")[1].split(":")[0].to_i
+	      if initial_offset > 0
+		  initial_offset = 0
+	      end
+	  end
+	  #puts "instruction #{i.inst_str} operands #{i.operands} initial_offset #{initial_offset}"
         f = Function.new(i.operands[0], i.inst_str, initial_offset, i)
 	f.set_vars i.operands
         @functions.merge!((i.operands[0]) => f)
@@ -268,31 +276,33 @@ class Program
 
 
   def from_ssa
+      #puts @functions_info
+      initial_index = 1
       @functions.each do |name, f|
-	  f.convert_from_ssa
+	  #puts "Working on #{name} at #{initial_index}"
+	  initial_index, entry_point = f.convert_from_ssa(initial_index)
+	  @functions_info[name] = entry_point
+      end
+      
+      # now fix up call instructions
+      @functions.each do |name, f|
+	  f.fix_up_calls( @functions_info, @orig_functions_index )
       end
   end
 
-  def codegen #(filename)
+  def codegen(filename)
+      this_filename = filename + "-opt.il"
+      file = File.new(this_filename, "w")
 
-      # # renumber
-
-      # @header.each do |i|
-      # 	  puts "header: #{i.inst_str};"
-      # end
-
-      # # emit method declarations
-      # @functions.each do |name, f|
-      # 	  puts "method: #{f.inst_str};"
-      # end
-      
       @header.each do |i|
-	  puts i.codegen( self )
+	  file.puts i.codegen( self )
       end
 
       @functions.each do |name, f|
-	  f.write_il
+	  f.write_il file
       end
+
+      file.close
   end
 
 end

@@ -498,10 +498,17 @@ class Function
 		    # to an ssa variable
 		    if ins.operands[1].include?("$") and not ins.operands[1].include?("#")
 			# insert into symbol table
-			puts "Inserting @symbol_table[ #{ins.operands[1]} ] = #{ins.operands[0]}"
-			@symbol_table[ ins.operands[1] ] = ins.operands[0]
-			# and remove instruction
-			bb.instructions.delete_at(i)
+			#puts "Inserting (moves) @symbol_table[ #{ins.operands[1]} ] = #{ins.operands[0]}"
+			@symbol_table[ ins.operands[1] ] = ins.operands[0].to_s
+		
+			# might this be a jump target? if so, make it a nop instead of deleting.
+			if i == 0
+			    mh = "instr #{ins.id}: nop"
+			    bb.instructions[i].reset( mh.scan(/[^\s]+/) )
+			else
+			    # remove instruction
+			    bb.instructions.delete_at(i)
+			end
 		    end
 		end
 	    end
@@ -523,9 +530,6 @@ class Function
 		# extract variable name. why is this not the key?
 		variable_name = strip_address(value[0])
 
-		# insert this ssa variable's name and register number in symbol table
-		@symbol_table[ value[0] ] = key
-
 		# allocate space for variables
 		# this is always a 4-byte integer or pointer
 		@new_variable_index -= 4
@@ -536,6 +540,12 @@ class Function
 		line = "instr #{@new_instruction_index}: move #{phi_variable_name} #{value[0]}"
 		inst = line.scan(/[^\s]+/)
 		bb.instructions.unshift Instruction.new( inst )
+
+		# insert this ssa variable's name and register number in symbol table
+		reg = '(' + @new_instruction_index.to_s + ')'
+		#puts "Inserting (reads) @symbol_table[ #{value[0]} ] = #{reg}"
+		@symbol_table[ value[0] ] = reg
+
 		@new_instruction_index += 1
 
 		# todo more types?
@@ -627,8 +637,10 @@ class Function
 	private
 	def renumber_instructions( bb )
 	    bb.instructions.each do |i|
+
 		# assign new id
 		i.post_ssa_id = @new_instruction_index
+		#puts "instruction #{i.id}/#{i.post_ssa_id}: #{i.codegen(self)}"
 		@new_instruction_index += 1
 
 		# update new-to-old map
@@ -649,11 +661,16 @@ class Function
 		case ins.opcode
 		when "enter"
 		    ins.operands[0] = -@new_variable_index
-		when "br", "call"
+		when "br"
 		    ins.operands[0] = @instruction_map[ ins.operands[0] ]
+		when "call"
+		    #ins.operands[0] = @instruction_map[ ins.operands[0] ]
 		when "blbc", "blbs"
-		    ins.operands[0] = @instruction_map[ ins.operands[0] ]
-		    ins.operands[1] = @instruction_map[ ins.operands[1] ]
+		    new0 = @instruction_map[ ins.operands[0] ]
+		    new1 = @instruction_map[ ins.operands[1] ]
+		    #puts "#{ins.opcode}: [#{ins.operands[0]}] [#{ins.operands[1]}] [#{new0}] [#{new1}] [#{@instruction_map[59]}]"
+		    ins.operands[0] = new0
+		    ins.operands[1] = new1
 		else
 		    ins.operands.each_index do |i|
 		    	# might we need to convert it?
@@ -676,20 +693,21 @@ class Function
 		    	    	if ins.operands[i].include?("#")
 		    	    	    # leave it alone
 		    	    	else    # ssa use, so replace with def register
-		    	    	    puts "processing ssa use #{ins.opcode} #{ins.operands.join(' ')} with operand #{ins.operands[i]}"
+		    	    	    #puts "processing ssa use #{ins.opcode} #{ins.operands.join(' ')} with operand #{ins.operands[i]}"
 		    	    	    var = ins.operands[i]
+				    #puts "Checking for #{ins.operands[i]} = #{@symbol_table[ ins.operands[i] ]}"
 		    	    	    old_reg = @symbol_table[ var ]
 				    new_reg = old_reg
 				    if old_reg.is_a?(String) and old_reg.include?("(")
 					new_reg = "(" + @instruction_map[ old_reg.sub('(','').sub(')','').to_i ].to_s + ")"
 				    end
-		    	    	    puts "processing ssa use #{ins.opcode} #{ins.operands.join(' ')} with var #{var} old_reg #{old_reg} new_reg #{new_reg}"
+		    	    	    #puts "processing ssa use #{ins.opcode} #{ins.operands.join(' ')} with var #{var} old_reg #{old_reg} new_reg #{new_reg}"
 		    	    	    ins.operands[i] = new_reg
 		    	    	end
 		    	    end
 
 		    	else
-		    	    puts "What do I do with #{ins.opcode} #{ins.operands[i]}"
+		    	    #puts "What do I do with #{ins.opcode} #{ins.operands[i]}"
 		    	end
 		    end
 		end
@@ -703,7 +721,7 @@ class Function
 
 
 	public
-	def convert_from_ssa
+	def convert_from_ssa( initial_index )
 
 	    # we use the naive ssa tranlation approach, followed by 
 
@@ -736,19 +754,26 @@ class Function
 	    convert_ssa_moves(@doms[0])
 
 	    # renumber instructions
-	    @new_instruction_index = 1
+	    @new_instruction_index = initial_index
 	    renumber_instructions(@doms[0])
-
-	    # replace ssa variable uses with registers from variable reads
-	    # this fixes branch targets too
-	    renumber_operands(@doms[0])
 
 	    # dump symbol table
 	    if false
 		@symbol_table.each do |key, value|
-		    puts "#{key} => #{value}"
+		    puts "symbol #{key} => #{value}"
 		end
 	    end
+
+	    # dump instruction mapping
+	    if false
+		@instruction_map.each do |key, value|
+		    puts "instruction #{key} => #{value}"
+		end
+	    end
+
+	    # replace ssa variable uses with registers from variable reads
+	    # this fixes branch targets too
+	    renumber_operands(@doms[0])
 
 	    #puts @ssa_temp_vars
 
@@ -759,21 +784,35 @@ class Function
 	    mh = "method #{name}@#{@doms[0].id} #{initial_vars.join(' ')} #{@ssa_temp_vars.join(' ')}"
 	    @method_header.reset( mh.scan(/[^\s]+/) )
 	    #puts @method_header
+
+	    return @new_instruction_index, @doms[0].id
 	end
 
+	public
+	def fix_up_calls( functions_info, orig_functions_index )
+	    bbs.each do |bb|
+		bb.instructions.each do |i|
+		    if i.opcode == "call"
+			new_entry = functions_info[ orig_functions_index[ i.operands[0] ] ]
+			#puts "old entry #{i.operands[0]} new entry #{new_entry}"
+			i.operands[0] = new_entry
+		    end
+		end
+	    end
+	end
 
 	private
-	def write_il_helper(bb)
+	def write_il_helper(file, bb)
 	    bb.instructions.each do |i|
-		puts i.codegen( self )
+		file.puts( i.codegen( self ))
 	    end
 	    bb.idominates.each do |y|
-	    	write_il_helper y if bb != y
+	    	write_il_helper( file, y ) if bb != y
 	    end
 	end
 
 	public
-	def write_il
-	    write_il_helper(@doms[0])
+	def write_il(file)
+	    write_il_helper file, @doms[0]
 	end
 end

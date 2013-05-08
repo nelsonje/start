@@ -18,5 +18,5 @@ p.to_ssa
 p.from_ssa
 
 p.dump_cfgs ARGV[0]
-p.codegen
+p.codegen ARGV[0]
 

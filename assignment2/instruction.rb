@@ -81,11 +81,11 @@ class Instruction
 	@ssa_mod_operands.each do |op_i|
 	  case @opcode
 	  when "blbc", "blbs", "sub", "add", "mul", "div", "mod", "cmpeq", "cmple", "cmplt", "istype", "store", "move", "checkbounds", "checktype", "lddynamic", "isnull", "load", "new", "newlist", "checknull", "write", "param", "stdynamic"
-	      puts "Replacing"
-	      p @inst_str[op_i+3]
-	      puts "By"
-	      p @operands[op_i]
-	      p op_i
+	      # puts "Replacing"
+	      # p @inst_str[op_i+3]
+	      # puts "By"
+	      # p @operands[op_i]
+	      # p op_i
 	      @inst_str[op_i+3] = @operands[op_i].dup
 	  end
       end
@@ -95,14 +95,17 @@ class Instruction
 
   def codegen(f)
       case @opcode
-#      when  "method"
-#	  "#{ @inst_str.join(' ') }"
+      when  "method", "global", "type"
+	  "#{ @inst_str.join(' ') }"
       when "blbc", "blbs"
 	  # TODO doesn't quite work if these ops take constant arguments
 	  "instr #{id}: #{@opcode} (#{ @operands[0] }) [#{ @operands[1] }]" # (#{ @inst_str.join(' ') }) "
+      when "br", "call"
+	  # TODO doesn't quite work if these ops take constant arguments
+	  "instr #{id}: #{@opcode} [#{ @operands[0] }]" # (#{ @inst_str.join(' ') }) "
       else
-	  "#{ @inst_str.join(' ') }"
-	  #"instr #{id}: #{@opcode} #{ @operands.join(' ') }" # (#{ @inst_str.join(' ') })"
+	  #"#{ @inst_str.join(' ') }"
+	  "instr #{id}: #{@opcode} #{ @operands.join(' ') }" # (#{ @inst_str.join(' ') })"
 	  #"instr #{id}: #{@opcode} #{ @operands.join(' ') }" # (#{ @inst_str.join(' ') })"
       end
   end
