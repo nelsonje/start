@@ -187,7 +187,7 @@ whether it is either a phi function with all the arguments equal to
 some constant \emph{c}, or a regular instruction whose result can be computed
 statically. In both cases we remove such instruction from the program and
 propagate its result to all the instructions that use the result of the deleted
-instruction. All the instructions that receive the propagated constant is
+instruction. All the instructions that receive the propagated constant are
 added to the work list again.
 
 Figure~\ref{fig:regslarge-nothing} shows one simple code example. Similar instructions
@@ -202,8 +202,8 @@ Now, instructions 10 to 34 were eliminated as they compute the same value comput
 Then, each add used to accumulate the results from instructions 9 to 34 now uses the result of instruction 9.
 Next, notice that, in Figure~\ref{fig:regslarge-nothing}, instructions 63 to 88 do the same
 that instructions 9 to 34 did. Since this result was already calculated by instruction 9, instructions 63 to 88
-are completely eliminated after constant propagation (Figure~\ref{fig:regslarge-scp}. In addition, as instructions
-89 to 113 do the same that instructions 35 to 59 did (i.e. accumulate the result os instructions 89 to 113, which calculate the same value calculated
+are completely eliminated after constant propagation (Figure~\ref{fig:regslarge-scp}). In addition, as instructions
+89 to 113 do the same that instructions 35 to 59 did (i.e. accumulate the result of instructions 89 to 113, which calculate the same value calculated
 by instructions 9 to 34,) they are also removed and the result is simply replaced by the value already
 calculated by instruction 59.
 
