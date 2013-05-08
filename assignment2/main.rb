@@ -1,13 +1,13 @@
 require_relative 'program'
 
 ssa_enabled = true
-cse_enabled = false
-scp_enabled = false
+cse_enabled = true
+scp_enabled = true
 
 cfg_enabled = true
 ir_enabled = true
 bssa_enabled = true
-report_enabled = false
+report_enabled = true
 
 ARGV.each do |str|
     if str.include? "-opt="
@@ -74,7 +74,10 @@ p.build_doms
 p.to_ssa if ssa_enabled
 
 p.scp if scp_enabled
+p.report_gen_scp if scp_enabled and report_enabled
+
 p.gcse if cse_enabled
+p.report_gen_gcse if cse_enabled and report_enabled
 
 p.from_ssa if bssa_enabled
 

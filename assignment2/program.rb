@@ -87,7 +87,7 @@ class Program
   def report_gen_scp
   	@functions.each do |name, f|
 		puts "Function: " + name
-		puts "Number of constants propagated: " + f.n_cprop
+		puts "Number of constants propagated: " + f.n_cprop.to_s
 	end
   end
 
@@ -95,7 +95,7 @@ class Program
   def report_gen_gcse
   	@functions.each do |name, f|
 		puts "Function: " + name
-		puts "Number of expressions eliminated: " + f.n_expr_eliminated
+		puts "Number of expressions eliminated: " + f.n_expr_eliminated.to_s
 	end
   end
 
