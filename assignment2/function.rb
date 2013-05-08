@@ -700,13 +700,25 @@ class Function
 		when "call"
 		    #ins.operands[0] = @instruction_map[ ins.operands[0] ]
 		when "blbc", "blbs"
+		    #puts "found #{ins.opcode} #{ins.id} #{ins.post_ssa_id} with #{ins.operands[0]}, #{ins.operands[1]}"
 		    if ins.operands[0].is_a?(String)
 			new0 = ins.operands[0]
 		    else
 			new0 = @instruction_map[ ins.operands[0] ]
 		    end
-		    new1 = @instruction_map[ ins.operands[1] ]
-		    #puts "#{ins.opcode}: [#{ins.operands[0]}] [#{ins.operands[1]}] [#{new0}] [#{new1}] [#{@instruction_map[59]}]"
+		    t = ins.operands[1].to_i
+		    # while !@instruction_map.has_key?( t )
+		    # 	t += 1
+		    # end
+
+		    # TODO: FIX Value numbering instruction deletion
+		    new1 = @instruction_map[ t ]
+		    if !@instruction_map.has_key?( t )
+			new1 = bb.sucs[1].id
+		    end
+		    #new1 = @instruction_map[ t ]
+
+		    #puts "#{ins.opcode}: [#{ins.operands[0]}] [#{ins.operands[1]}] [#{new0}] [#{new1}]"
 		    ins.operands[0] = new0
 		    ins.operands[1] = new1
 		else
