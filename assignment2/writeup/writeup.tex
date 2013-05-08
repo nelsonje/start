@@ -179,18 +179,33 @@ void main()
 We implemented simple sparse constant propagation. We chose not to do
 conditional constant propagation; neither did we remove dead code from
 branches that were killed by constant
-propagation. Figure~\ref{fig:postscp} shows how constant propagation
-works for Example~\ref{fig:ssa-code}; we are able to eliminate all
-computation from the example. 
+propagation.
 
-\begin{figure}
+
+\begin{figure*}
 \begin{center}
-  \includegraphics[width=0.95\columnwidth]{figs/postscp.pdf}
+\vspace{-1in}
+  \includegraphics[height=0.75\paperheight]{figs/andre1.pdf}
 \begin{minipage}{0.95\columnwidth}
-  \caption{\label{fig:postscp} Subset of CFG from \texttt{regslarge.dart} after applying constant propagation.}
+  \caption{\label{fig:regslarge-nothing} Subset of CFG from \texttt{regslarge.dart} without optimizations.}
 \end{minipage}
 \end{center}
-\end{figure}
+\end{figure*}
+
+
+\begin{figure*}
+\begin{center}
+\vspace{-1in}
+  \includegraphics[height=0.75\paperheight]{figs/andre2.pdf}
+\begin{minipage}{0.95\columnwidth}
+  \caption{\label{fig:regslarge-scp} Subset of CFG from \texttt{regslarge.dart} afer applying constant propagation.}
+\end{minipage}
+\end{center}
+\end{figure*}
+
+
+
+
 
 \section{Value numbering}
 
@@ -201,24 +216,15 @@ operations in memory, and while we could possibly reason about
 situations where optimizations could be safe we chose to keep things
 simple.
 
-%% \begin{figure}
-%% \begin{center}
-%%   \includegraphics[width=0.95\columnwidth]{figs/prevn.pdf}
-%% \begin{minipage}{0.95\columnwidth}
-%%   \caption{\label{fig:prevn} Subset of CFG from \texttt{regslarge.dart} before applying value numbering.}
-%% \end{minipage}
-%% \end{center}
-%% \end{figure}
-
-%% \begin{figure}
-%% \begin{center}
-%%   \includegraphics[width=0.95\columnwidth]{figs/simple6-postssa.pdf}
-%% \begin{minipage}{0.95\columnwidth}
-%%   \caption{\label{fig:postvn} Subset of CFG from \texttt{regslarge.dart} after applying value numbering.}
-%% \end{minipage}
-%% \end{center}
-%% \end{figure}
-
+\begin{figure*}
+\begin{center}
+\vspace{-1in}
+  \includegraphics[height=0.75\paperheight]{figs/andre3.pdf}
+\begin{minipage}{0.95\columnwidth}
+  \caption{\label{fig:regslarge-gce} Subset of CFG from \texttt{regslarge.dart} afer applying value numbering.}
+\end{minipage}
+\end{center}
+\end{figure*}
 
 \section{Conclusion}
 
