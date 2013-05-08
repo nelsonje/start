@@ -1,5 +1,5 @@
 class Instruction
-  attr_accessor   :id, :opcode, :operands, :rhs, :lhs, :ssa_mod_operands, :expr
+  attr_accessor   :id, :opcode, :operands, :rhs, :lhs, :ssa_mod_operands, :expr, :bb, :bl_operand
   attr_reader     :inst_str, :nop
 
   def initialize(inst)
@@ -26,6 +26,9 @@ class Instruction
       @id = -1
     end
     @operands = []
+    #BB to which this inst belongs
+    @bb
+    @bl_operand
 
 
     #TODO
@@ -46,6 +49,7 @@ class Instruction
     when "blbc", "blbs"
       info = inst[3].scan(/[\d]+/)
       @operands.push Integer(info[0])
+      @bl_operand = inst[3]
       info = inst[4].scan(/[\d]+/)
       @operands.push Integer(info[0])
     when "ret", "enter"
@@ -85,7 +89,11 @@ class Instruction
 			#puts "By"
 			#p @operands[op_i]
 			#p op_i
-			@inst_str[op_i+3] = @operands[op_i].dup
+			if @operands[op_i].instance_of? Fixnum
+				@inst_str[op_i+3] = @operands[op_i]
+			else
+				@inst_str[op_i+3] = @operands[op_i].dup
+			end
 		end
 	end
 
