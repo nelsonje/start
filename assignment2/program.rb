@@ -100,13 +100,25 @@ class Program
 		end
 		phi_counter += 1
 		text = ""
-		text << var.to_s << " = phi("
+		# text << var.to_s << " = phi("
+		# options.each_index do |i|
+		# 	text << options[i]
+		# 	if i != options.length - 1
+		# 		text << ", "
+		# 	end
+		# end
+
+		  # print phi nodes like the rest of the world
+		text << var.to_s << " = " << options[0] << " = phi("
 		options.each_index do |i|
-			text << options[i]
-			if i != options.length - 1
-				text << ", "
-			end
+		      if i > 0 
+			  text << options[i]
+			  if i != options.length - 1
+			      text << ", "
+			  end
+		      end
 		end
+
 		text << ")"
 		file.print("<phi-" + var.to_s + "> " + text)
 		if (phi_counter == f.bbs[i].phi.length) && (f.bbs[i].instructions.length == 0)
@@ -119,7 +131,8 @@ class Program
         for inst in 0...f.bbs[i].instructions.length
 	  f.bbs[i].instructions[inst].fix_inst_string_ssa
           text = ""
-          f.bbs[i].instructions[inst].inst_str.each {|str| text << " " << str}
+	    #f.bbs[i].instructions[inst].inst_str.each {|str| text << " " << str}
+	    text << f.bbs[i].instructions[inst].codegen(self)
           file.print("<c" + inst.to_s + "> " + text)
           if inst == (f.bbs[i].instructions.length - 1)
             file.print("}\"];\n")
@@ -154,7 +167,10 @@ class Program
       @instructions.push(i)
       @last_inst_id = Integer(inst[1].chomp(':'))
     else
-      @header.push(i)
+	# any non-blank lines are header instructions
+	if ! i.inst_str.empty?
+	    @header.push(i)
+	end
     end
   end
 
@@ -172,7 +188,10 @@ class Program
     for i in @header
       if i.opcode == "method"
         @functions_info[i.operands[0]] = i.operands[1]
-        f = Function.new(i.operands[0])
+	  # get offset of last operand
+	  initial_offset = i.inst_str[-1].split("#")[1].split(":")[0].to_i
+	  puts "instruction #{i.inst_str} operands #{i.operands} initial_offset #{initial_offset}"
+        f = Function.new(i.operands[0], i.inst_str, initial_offset, i)
 	f.set_vars i.operands
         @functions.merge!((i.operands[0]) => f)
       end
@@ -245,6 +264,35 @@ class Program
     @functions.each do |name, f|
       f.find_doms
     end
+  end
+
+
+  def from_ssa
+      @functions.each do |name, f|
+	  f.convert_from_ssa
+      end
+  end
+
+  def codegen #(filename)
+
+      # # renumber
+
+      # @header.each do |i|
+      # 	  puts "header: #{i.inst_str};"
+      # end
+
+      # # emit method declarations
+      # @functions.each do |name, f|
+      # 	  puts "method: #{f.inst_str};"
+      # end
+      
+      @header.each do |i|
+	  puts i.codegen( self )
+      end
+
+      @functions.each do |name, f|
+	  f.write_il
+      end
   end
 
 end

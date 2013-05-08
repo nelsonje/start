@@ -14,6 +14,9 @@ p.build_doms
 #p.dump_info ARGV[0]
 
 p.to_ssa
-p.dump_cfgs ARGV[0]
 
+p.from_ssa
+
+p.dump_cfgs ARGV[0]
+p.codegen
 

@@ -1,10 +1,12 @@
 class Function
-  attr_accessor :bbs, :name
-  def initialize(name)
+  attr_accessor :bbs, :name, :inst_str
+  def initialize(name, inststr, initial_offset, header)
     @name = name
+      @method_header = header
     @bbs = []
     @topo = []
     @doms = []
+    @inst_str = inststr
     #For each variable, gives the set of BBs in which it's assigned to.
     #Necessary for SSA construction
     @var_bb_def = {}
@@ -14,6 +16,24 @@ class Function
     #Auxiliary vars needed for SSA construction (var renaming)
     @c = {}
     @s = {}
+
+      # storage for ssa-to-normal variables
+      @new_instruction_index = 0
+
+      # start allocating new variables at this offset
+      @new_variable_index = initial_offset
+      @ssa_temp_vars = []
+
+      # new-to-old instruction id map
+      @instruction_map = {}
+
+      # temporary mapping of phi nodes to variable names
+      @phi_variables = {}
+
+      # symbol table
+      @symbol_table = {}
+
+
   end
 
   private
@@ -30,6 +50,7 @@ class Function
   	set_var_bb_def
 	last_id = place_phis(last_id)
 	rename_vars
+      @new_instruction_index = last_id + 1
 	last_id
   end
 
@@ -89,10 +110,12 @@ class Function
 
 	x.sucs.each do |y|
 		j = which_pred(y, x)
-		y.phi.each do |left, right|
-			right[j+1] = strip_address(right[0]) + "$" + @s[strip_address(right[0])].last.to_s
-			#puts "Index: " + @s[strip_address(right[0])].last.to_s + "       Strip: " + strip_address(right[0])
-		end
+	  #	  puts "#{x} successor #{y} pred #{j}"
+	  y.phi.each do |left, right|
+	      #	      puts "#{x} successor #{y} pred #{j} left #{left} right #{right}"
+	      right[j+1] = strip_address(right[0]) + "$" + @s[strip_address(right[0])].last.to_s
+	      #	      puts "Index: " + @s[strip_address(right[0])].last.to_s + "       Strip: " + strip_address(right[0])
+	  end
 	end
 
 	x.idominates.each do |y|
@@ -441,4 +464,316 @@ class Function
 		compute_df_helper @doms[0]
 	end
 
+	public
+	def compute_ssc
+	    
+	end
+
+
+	private 
+	def get_phi_name(p)
+	    #p.
+	end
+
+
+	private
+	def count_phi_nodes( bb )
+	    nodes = bb.phi.length
+	    bb.idominates.each do |child|
+		if bb != child
+		    nodes += count_phi_nodes( child )
+		end
+	    end
+	    nodes
+	end
+
+	# turn moves to ssa variables into register operations
+	private
+	def convert_ssa_moves( bb )
+
+	    bb.instructions.each_index do |i|
+		ins = bb.instructions[i]
+		# if it's a move
+		if ins.opcode == "move"
+		    # to an ssa variable
+		    if ins.operands[1].include?("$") and not ins.operands[1].include?("#")
+			# insert into symbol table
+			puts "Inserting @symbol_table[ #{ins.operands[1]} ] = #{ins.operands[0]}"
+			@symbol_table[ ins.operands[1] ] = ins.operands[0]
+			# and remove instruction
+			bb.instructions.delete_at(i)
+		    end
+		end
+	    end
+
+	    # recurse down dominator tree
+	    bb.idominates.each do |y|
+	    	convert_ssa_moves y if bb != y
+	    end
+
+	end
+
+
+	# allocate temporary variable and insert reads
+	private
+	def insert_ssa_reads( bb )
+
+	    # add temporary variable and read for every phi node
+	    bb.phi.each do | key, value |
+		# extract variable name. why is this not the key?
+		variable_name = strip_address(value[0])
+
+		# insert this ssa variable's name and register number in symbol table
+		@symbol_table[ value[0] ] = key
+
+		# allocate space for variables
+		# this is always a 4-byte integer or pointer
+		@new_variable_index -= 4
+		phi_variable_name = "__#{variable_name}$#{key}#" + @new_variable_index.to_s
+		@phi_variables[key] = phi_variable_name
+
+		#puts "In bb #{bb.id}, adding read from #{phi_variable_name}"
+		line = "instr #{@new_instruction_index}: move #{phi_variable_name} #{value[0]}"
+		inst = line.scan(/[^\s]+/)
+		bb.instructions.unshift Instruction.new( inst )
+		@new_instruction_index += 1
+
+		# todo more types?
+		@ssa_temp_vars.push phi_variable_name + ":int"
+	    end
+
+	    # recurse down dominator tree
+	    bb.idominates.each do |y|
+	    	insert_ssa_reads y if bb != y
+	    end
+
+	end
+
+	# add writes to temporary ssa variables
+	private
+	def insert_ssa_writes( bb )
+
+	    # for each successor of this block
+	    bb.sucs.each do | succ |
+		# whiy don't we just store this?
+		bb_source_id = which_pred(succ, bb)
+
+	    	# for each phi node we are a source for, insert a variable 
+	    	succ.phi.each do |key, value|
+	    	    # extract variable name. why is this not the key?
+	    	    variable_name = strip_address(value[0])
+
+	    	    # is this block a source for this variable?
+		    source_id_str = value[bb_source_id+1].split("$")[1]
+		    if source_id_str
+			phi_variable_name = @phi_variables[key]
+			#puts "In bb #{bb.id}, adding write to #{phi_variable_name} from #{variable_name}$#{source_id_str}"
+			line = "instr #{@new_instruction_index}: move #{variable_name}$#{source_id_str} #{phi_variable_name}"
+			# split instruction string so we can instantiate the instruction
+			inst = line.scan(/[^\s]+/)
+			
+			# must make sure write comes before branches, but after normal code (that may do assignments)
+			last_inst = bb.instructions.pop
+			case last_inst.opcode
+			when "br", "blbc", "blbs", "ret"
+			    bb.instructions.push Instruction.new( inst )
+			    bb.instructions.push last_inst
+			else
+			    bb.instructions.push last_inst
+			    bb.instructions.push Instruction.new( inst )
+			end
+			@new_instruction_index += 1
+		    end
+			
+	    	end
+	    end
+
+	    bb.idominates.each do |y|
+	    	insert_ssa_writes y if bb != y
+	    end
+
+	end
+
+
+	private
+	def remove_phi_nodes( bb )
+
+	    bb.phi = {}
+	    
+	    # recurse
+    	    bb.idominates.each do |y|
+	    	remove_phi_nodes y if bb != y
+	    end
+	end
+
+	private
+	def fix_branch_targets( bb )
+	    bb.instructions.each do |i|
+		# assign new id
+		i.post_ssa_id = @new_instruction_index
+		@new_instruction_index += 1
+
+		# update new-to-old map
+		puts "Adding mapping from old #{i.id} to new #{i.post_ssa_id}"
+		@instruction_map[i.id] = i.post_ssa_id
+	    end
+	    
+	    # recurse
+    	    bb.idominates.each do |y|
+	    	renumber_instructions y if bb != y
+	    end
+	end
+
+	private
+	def renumber_instructions( bb )
+	    bb.instructions.each do |i|
+		# assign new id
+		i.post_ssa_id = @new_instruction_index
+		@new_instruction_index += 1
+
+		# update new-to-old map
+		#puts "Adding mapping from old #{i.id} to new #{i.post_ssa_id}"
+		@instruction_map[i.id] = i.post_ssa_id
+		i.id = i.post_ssa_id
+	    end
+	    
+	    # recurse
+    	    bb.idominates.each do |y|
+	    	renumber_instructions y if bb != y
+	    end
+	end
+
+	private
+	def renumber_operands( bb )
+	    bb.instructions.each do |ins|
+		case ins.opcode
+		when "enter"
+		    ins.operands[0] = -@new_variable_index
+		when "br", "call"
+		    ins.operands[0] = @instruction_map[ ins.operands[0] ]
+		when "blbc", "blbs"
+		    ins.operands[0] = @instruction_map[ ins.operands[0] ]
+		    ins.operands[1] = @instruction_map[ ins.operands[1] ]
+		else
+		    ins.operands.each_index do |i|
+		    	# might we need to convert it?
+		    	if ins.operands[i].is_a?(String)
+		    	    s = ins.operands[i]
+		    	    # is it a register operand?
+		    	    if s[0] == "("
+		    		reg = ins.operands[i].sub('(','').sub(')','').to_i
+		    		new_reg = @instruction_map[ reg ]
+		    		ins.operands[i] = "(#{ new_reg })"
+
+			    elsif ins.operands[i][-1] == "$"
+				# is it an ssa initial value?
+		    	    	ins.operands[i] = @symbol_table[ ins.operands[i] ]
+
+		    	    elsif ins.operands[i].include?("$")
+				# is it an ssa use?
+
+		    	    	# is it an ssa temporary?
+		    	    	if ins.operands[i].include?("#")
+		    	    	    # leave it alone
+		    	    	else    # ssa use, so replace with def register
+		    	    	    puts "processing ssa use #{ins.opcode} #{ins.operands.join(' ')} with operand #{ins.operands[i]}"
+		    	    	    var = ins.operands[i]
+		    	    	    old_reg = @symbol_table[ var ]
+				    new_reg = old_reg
+				    if old_reg.is_a?(String) and old_reg.include?("(")
+					new_reg = "(" + @instruction_map[ old_reg.sub('(','').sub(')','').to_i ].to_s + ")"
+				    end
+		    	    	    puts "processing ssa use #{ins.opcode} #{ins.operands.join(' ')} with var #{var} old_reg #{old_reg} new_reg #{new_reg}"
+		    	    	    ins.operands[i] = new_reg
+		    	    	end
+		    	    end
+
+		    	else
+		    	    puts "What do I do with #{ins.opcode} #{ins.operands[i]}"
+		    	end
+		    end
+		end
+	    end
+	    
+	    # recurse
+    	    bb.idominates.each do |y|
+	    	renumber_operands y if bb != y
+	    end
+	end
+
+
+	public
+	def convert_from_ssa
+
+	    # we use the naive ssa tranlation approach, followed by 
+
+	    # for every phi node, we insert and write to a new
+	    # variable in the phi node source blocks. then we replace
+	    # the phi node with a read of the variable into a
+	    # register. 
+
+	    # to make this work we need to:
+	    # - allocate space for the phi-replacement variables
+	    # - add write instructions for the phi-replacement variables
+	    # - add read instructions for the phi-replacement variables
+	    # - replace ssa writes/moves with register uses
+	    # - fix up ssa uses to use register results of reads
+	    # - renumber all instructions
+
+	    # initialize symbol table with initial variables
+	    initial_vars = @inst_str
+	    initial_vars.shift(2)
+	    initial_vars.each do |v|
+		# insert ssa initial mapping
+		@symbol_table[ strip_address(v) + '$' ] = v.split(':')[0]
+	    end
+
+	    # turn phi nodes into variable reads/writes
+	    insert_ssa_reads(@doms[0])
+	    insert_ssa_writes(@doms[0])
+	    
+	    # turn ssa defs into registers
+	    convert_ssa_moves(@doms[0])
+
+	    # renumber instructions
+	    @new_instruction_index = 1
+	    renumber_instructions(@doms[0])
+
+	    # replace ssa variable uses with registers from variable reads
+	    # this fixes branch targets too
+	    renumber_operands(@doms[0])
+
+	    # dump symbol table
+	    if false
+		@symbol_table.each do |key, value|
+		    puts "#{key} => #{value}"
+		end
+	    end
+
+	    #puts @ssa_temp_vars
+
+	    # remove phi nodes
+	    remove_phi_nodes(@doms[0])
+
+	    # update function entry point
+	    mh = "method #{name}@#{@doms[0].id} #{initial_vars.join(' ')} #{@ssa_temp_vars.join(' ')}"
+	    @method_header.reset( mh.scan(/[^\s]+/) )
+	    #puts @method_header
+	end
+
+
+	private
+	def write_il_helper(bb)
+	    bb.instructions.each do |i|
+		puts i.codegen( self )
+	    end
+	    bb.idominates.each do |y|
+	    	write_il_helper y if bb != y
+	    end
+	end
+
+	public
+	def write_il
+	    write_il_helper(@doms[0])
+	end
 end
