@@ -521,7 +521,7 @@ class Function
 			@symbol_table[ ins.operands[1] ] = ins.operands[0].to_s
 		
 			# might this be a jump target? if so, make it a nop instead of deleting.
-			if i == 0
+			if i == 0 and bb.instructions.length < 2
 			    mh = "instr #{ins.id}: nop"
 			    bb.instructions[i].reset( mh.scan(/[^\s]+/) )
 			else
@@ -591,18 +591,20 @@ class Function
 	    	succ.phi.each do |key, value|
 	    	    # extract variable name. why is this not the key?
 	    	    variable_name = strip_address(value[0])
+		    source_str = value[bb_source_id+1]
 
 	    	    # is this block a source for this variable?
-		    source_id_str = value[bb_source_id+1].split("$")[1]
-		    if source_id_str
-			phi_variable_name = @phi_variables[key]
-			#puts "In bb #{bb.id}, adding write to #{phi_variable_name} from #{variable_name}$#{source_id_str}"
-			line = "instr #{@new_instruction_index}: move #{variable_name}$#{source_id_str} #{phi_variable_name}"
-			# split instruction string so we can instantiate the instruction
-			inst = line.scan(/[^\s]+/)
-			
-			# must make sure write comes before branches, but after normal code (that may do assignments)
-			last_inst = bb.instructions.pop
+		    phi_variable_name = @phi_variables[key]
+		    #puts "In bb #{bb.id}, adding write to #{phi_variable_name} from #{source_str}"
+		    line = "instr #{@new_instruction_index}: move #{source_str} #{phi_variable_name}"
+		    # split instruction string so we can instantiate the instruction
+		    inst = line.scan(/[^\s]+/)
+		    
+		    # must make sure write comes before branches, but after normal code (that may do assignments)
+		    last_inst = bb.instructions.pop
+		    if last_inst.nil?
+			bb.instructions.push Instruction.new( inst )
+		    else
 			case last_inst.opcode
 			when "br", "blbc", "blbs", "ret"
 			    bb.instructions.push Instruction.new( inst )
@@ -611,9 +613,8 @@ class Function
 			    bb.instructions.push last_inst
 			    bb.instructions.push Instruction.new( inst )
 			end
-			@new_instruction_index += 1
 		    end
-			
+		    @new_instruction_index += 1
 	    	end
 	    end
 
@@ -675,6 +676,20 @@ class Function
 	end
 
 	private
+	def insert_empty_block_noops( bb )
+	    if bb.instructions.length == 0
+		mh = "instr #{@new_instruction_index}: nop"
+		bb.instructions.push Instruction.new(mh.scan(/[^\s]+/))
+		@new_instruction_index += 1
+	    end
+	    
+	    # recurse
+    	    bb.idominates.each do |y|
+	    	insert_empty_block_noops y if bb != y
+	    end
+	end
+
+	private
 	def renumber_operands( bb )
 	    bb.instructions.each do |ins|
 		case ins.opcode
@@ -685,7 +700,11 @@ class Function
 		when "call"
 		    #ins.operands[0] = @instruction_map[ ins.operands[0] ]
 		when "blbc", "blbs"
-		    new0 = @instruction_map[ ins.operands[0] ]
+		    if ins.operands[0].is_a?(String)
+			new0 = ins.operands[0]
+		    else
+			new0 = @instruction_map[ ins.operands[0] ]
+		    end
 		    new1 = @instruction_map[ ins.operands[1] ]
 		    #puts "#{ins.opcode}: [#{ins.operands[0]}] [#{ins.operands[1]}] [#{new0}] [#{new1}] [#{@instruction_map[59]}]"
 		    ins.operands[0] = new0
@@ -783,6 +802,9 @@ class Function
 		@symbol_table[ strip_address(v) + '$' ] = v.split(':')[0]
 		@symbol_table[ strip_address(v) + '$0' ] = v.split(':')[0]
 	    end
+
+	    # add noops if we have empty blocks for looks
+	    insert_empty_block_noops( @doms[0] )
 
 	    # turn phi nodes into variable reads/writes
 	    insert_ssa_reads(@doms[0])

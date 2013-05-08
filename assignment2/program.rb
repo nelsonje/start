@@ -111,6 +111,7 @@ class Program
       file.puts "splines=true;"
       file.puts "entry [label=\"Entry\"];"
       for i in 0...f.bbs.length
+	  if f.bbs[i].id != -1
         file.print("n" + i.to_s + " [label=\"{BB " + f.bbs[i].id.to_s + " (idom: ")
 	if f.bbs[i].idom  == nil
 		file.print("none")
@@ -166,6 +167,8 @@ class Program
 	    #f.bbs[i].instructions[inst].inst_str.each {|str| text << " " << str.to_s}
 	    text << f.bbs[i].instructions[inst].codegen(self)
           file.print("<c" + inst.to_s + "> " + text)
+	    #puts "inst is #{inst}, len is #{f.bbs[i].instructions.length-1}: #{f.bbs[i].instructions[inst].inst_str} #{0 == inst and inst == (f.bbs[i].instructions.length - 1)}"
+	    #file.print( f.bbs[i].instructions[inst].opcode )
           if inst == (f.bbs[i].instructions.length - 1)
             file.print("}\"];\n")
           else
@@ -173,6 +176,9 @@ class Program
           end
         end
 
+	  else
+	      puts "Warning: empty block"
+	  end
       end
 
       file.puts("entry -> n0;") if !(f.bbs.empty?)
