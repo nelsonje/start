@@ -693,7 +693,7 @@ class Function
 	def renumber_operands( bb )
 	    bb.instructions.each do |ins|
 		case ins.opcode
-		when "enter"
+		when "enter", "ret"
 		    ins.operands[0] = -@new_variable_index
 		when "br"
 		    ins.operands[0] = @instruction_map[ ins.operands[0] ]
