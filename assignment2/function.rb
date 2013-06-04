@@ -849,23 +849,33 @@ class Function
 
 		    	    elsif ins.operands[i].include?("$")
 				# is it an ssa use?
+				#puts "id #{ins.id} ssa use: #{ins.opcode}: [#{ins.operands[0]}] [#{ins.operands[1]}] [#{ins.operands[2]}]" if $debug
 
 		    	    	# is it an ssa temporary?
 		    	    	if ins.operands[i].include?("#")
 		    	    	    # leave it alone
 		    	    	else    # ssa use, so replace with def register
-		    	    	    #puts "processing ssa use #{ins.opcode} #{ins.operands.join(' ')} with operand #{ins.operands[i]}"
+		    	    	    #puts "id #{ins.id}: processing ssa use #{ins.opcode} #{ins.operands.join(' ')} with operand #{ins.operands[i]}" if $debug
 		    	    	    var = ins.operands[i]
-				    #puts "Checking for #{ins.operands[i]} = #{@symbol_table[ ins.operands[i] ]}"
+				    #puts "Checking for #{ins.operands[i]} = #{@symbol_table[ ins.operands[i] ]}" if $debug
 		    	    	    old_reg = @symbol_table[ var ]
 				    new_reg = old_reg
 				    done = false
 				    while not done
-					#puts "at #{new_reg}"
+					puts "id #{ins.id}/#{ins.pre_ssa_id} ssa use walk: #{ins.opcode}: [#{ins.operands[0]}] [#{ins.operands[1]}] [#{ins.operands[2]}] at #{new_reg}" if $debug
+					#puts "at #{new_reg}" if $debug
 					if new_reg.is_a?(String) 
 					    #puts "at #{new_reg} string"
 					    if new_reg.include?("(")
-						new_reg = "(" + @instruction_map[ new_reg.sub('(','').sub(')','').to_i ].to_s + ")"
+						new_reg_num = new_reg.sub('(','').sub(')','').to_i
+						# check if this was a move into an ssa variable: replace it with a load
+						if ins.opcode == "move" and i == 1 and new_reg_num = ins.id
+						    puts "id #{ins.id}/#{ins.pre_ssa_id} move problem: #{ins.opcode}: [#{ins.operands[0]}] [#{ins.operands[1]}] [#{ins.operands[2]}] at #{new_reg}" if $debug
+						    ins.opcode = "load"
+						    new_reg = ""
+						else
+						    new_reg = "(" + @instruction_map[ new_reg.sub('(','').sub(')','').to_i ].to_s + ")"
+						end
 						done = true
 					    elsif new_reg.is_a?(String) and new_reg.include?("$") and new_reg.include?("#")
 						done = true
