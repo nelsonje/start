@@ -31,8 +31,9 @@ class Function
       @new_variable_index = initial_offset
       @ssa_temp_vars = []
 
-      # new-to-old instruction id map
+      # new-to-old instruction/bb id map
       @instruction_map = {}
+      @bb_map = {}
 
       # temporary mapping of phi nodes to variable names
       @phi_variables = {}
@@ -53,11 +54,17 @@ class Function
 
   public
   def to_ssa(last_id)
+
   	compute_df
   	set_var_bb_def
 	last_id = place_phis(last_id)
 	rename_vars
       @new_instruction_index = last_id + 1
+
+      # build map for later jump target adjustment
+      build_bb_map( @doms[0] )
+      #dump_bb_map
+
 	last_id
   end
 
@@ -690,13 +697,45 @@ class Function
 	end
 
 	private
+	def build_bb_map( bb )
+	    @bb_map[ bb.id ] = bb
+	    
+	    # recurse
+    	    bb.idominates.each do |y|
+	    	build_bb_map y if bb != y
+	    end
+	end
+
+	private
+	def dump_bb_map
+	    if $debug
+		puts "Current BB map:"
+		@bb_map.each_pair do |id,bb|
+		    puts "   #{id}: #{bb.id}"
+		end
+	    end
+	end
+
+	private
 	def renumber_operands( bb )
 	    bb.instructions.each do |ins|
 		case ins.opcode
 		when "enter"
 		    ins.operands[0] = -@new_variable_index
 		when "br"
-		    ins.operands[0] = @instruction_map[ ins.operands[0] ]
+		    if @bb_map.has_key?( ins.operands[0] )
+			puts "Found BB map entry for #{ ins.operands[0] }" if $debug
+			ins.operands[0] = @bb_map[ ins.operands[0] ].id
+		    else
+			t = ins.operands[0].to_i
+			new1 = @instruction_map[ t ]
+			# if !@instruction_map.has_key?( t ) 
+			#     new1 = bb.sucs[1].id
+			# end
+			new1 = @instruction_map[ t ]
+			puts "Didn't find BB map entry for #{ ins.operands[0] }: #{ ins.opcode } should be near #{ @instruction_map[ ins.operands[0] ] }, using #{ new1 } instead" if $debug
+			ins.operands[0] = new1
+		    end
 		when "call"
 		    #ins.operands[0] = @instruction_map[ ins.operands[0] ]
 		when "blbc", "blbs"
@@ -706,6 +745,8 @@ class Function
 		    else
 			new0 = @instruction_map[ ins.operands[0] ]
 		    end
+
+		    if false
 		    t = ins.operands[1].to_i
 		    # while !@instruction_map.has_key?( t )
 		    # 	t += 1
@@ -713,10 +754,19 @@ class Function
 
 		    # TODO: FIX Value numbering instruction deletion
 		    new1 = @instruction_map[ t ]
-		    if !@instruction_map.has_key?( t )
-			new1 = bb.sucs[1].id
+		    if @bb_map.has_key?( t )
+			puts "Found BB map entry for #{t}" if $debug
+			new1 = @bb_map[ t ].id
+		    else
+			puts "Didn't find BB map entry for #{t} (post-ssa ins #{new1})" if $debug
 		    end
-		    #new1 = @instruction_map[ t ]
+		    if !@instruction_map.has_key?( t )
+		    	new1 = bb.sucs[1].id
+		    end
+		    new1 = @instruction_map[ t ]
+		    end
+
+		    new1 = @bb_map[ ins.operands[1] ].id
 
 		    #puts "#{ins.opcode}: [#{ins.operands[0]}] [#{ins.operands[1]}] [#{new0}] [#{new1}]"
 		    ins.operands[0] = new0
@@ -843,9 +893,13 @@ class Function
 		end
 	    end
 
+	    #dump_bb_map
+
 	    # replace ssa variable uses with registers from variable reads
 	    # this fixes branch targets too
 	    renumber_operands(@doms[0])
+
+	    #dump_bb_map
 
 	    #puts @ssa_temp_vars
 
