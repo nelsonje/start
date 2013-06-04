@@ -9,7 +9,13 @@ ir_enabled = true
 bssa_enabled = true
 report_enabled = true
 
+$debug_print = false
+
 ARGV.each do |str|
+    if str.include? "-debug"
+	$debug_print = true
+    end
+
     if str.include? "-opt="
 	ssa_enabled = false
 	cse_enabled = false

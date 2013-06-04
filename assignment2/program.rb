@@ -316,7 +316,7 @@ class Program
       #puts @functions_info
       initial_index = 1
       @functions.each do |name, f|
-	  #puts "Working on #{name} at #{initial_index}"
+	  puts "\n\nWorking on #{name} at #{initial_index}" if $debug_print
 	  initial_index, entry_point = f.convert_from_ssa(initial_index)
 	  @functions_info[name] = entry_point
       end
