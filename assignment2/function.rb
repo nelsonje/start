@@ -122,12 +122,15 @@ class Function
 		end
 		#Only happens for "move" instructions
 		a.lhs.each do |v|
+	      puts "id #{a.id} changed before: #{a.opcode}: [#{a.operands[0]}] [#{a.operands[1]}] [#{a.operands[2]}]" if $debug
 			i = @c[v]
 			if strip_address(a.operands[1]) == v
 				new_operand = strip_address a.operands[1]
 				a.operands[1] = new_operand + "$" + i.to_s
 				a.ssa_mod_operands.push 1
 			end
+				    puts "id #{a.id} changed: #{a.opcode}: [#{a.operands[0]}] [#{a.operands[1]}] [#{a.operands[2]}]" if $debug
+
 			@s[v].push i
 			#puts "(Normal) Pushing " + i.to_s + " for " + v
 			@c[v] = i + 1
@@ -663,10 +666,17 @@ class Function
 
 	    	    # is this block a source for this variable?
 		    phi_variable_name = @phi_variables[key]
-		    #puts "In bb #{bb.id}, adding write to #{phi_variable_name} from #{source_str}"
 		    line = "instr #{@new_instruction_index}: move #{source_str} #{phi_variable_name}"
+		    puts "In bb #{bb.id}, adding write to #{phi_variable_name} from #{source_str}: #{line}" if $debug
 		    # split instruction string so we can instantiate the instruction
 		    inst = line.scan(/[^\s]+/)
+
+		    # prev = @symbol_table[ source_str ]
+		    # puts "key: #{key} source_str: #{source_str} prev: #{prev} new: #{phi_variable_name}"
+
+		    # if not @symbol_table.include?( source_str )
+		    # 	@symbol_table[ source_str ] = phi_variable_name
+		    # end
 		    
 		    # must make sure write comes before branches, but after normal code (that may do assignments)
 		    last_inst = bb.instructions.pop
@@ -691,7 +701,6 @@ class Function
 	    end
 
 	end
-
 
 	private
 	def remove_phi_nodes( bb )
@@ -735,6 +744,7 @@ class Function
 		#puts "Adding mapping from old #{i.id} to new #{i.post_ssa_id}"
 		@instruction_map[i.id] = i.post_ssa_id
 		i.id = i.post_ssa_id
+
 	    end
 	    
 	    # recurse
@@ -833,6 +843,7 @@ class Function
 		    ins.operands[0] = new0
 		    ins.operands[1] = new1
 		else
+		    puts "id #{ins.id}/#{ins.pre_ssa_id} before: #{ins.opcode}: [#{ins.operands[0]}] [#{ins.operands[1]}] [#{ins.operands[2]}]" if $debug
 		    ins.operands.each_index do |i|
 		    	# might we need to convert it?
 		    	if ins.operands[i].is_a?(String)
@@ -841,6 +852,9 @@ class Function
 		    	    if s[0] == "("
 		    		reg = ins.operands[i].sub('(','').sub(')','').to_i
 		    		new_reg = @instruction_map[ reg ]
+				if ins.opcode == "blbc"
+				    puts "id #{ins.id}/#{ins.pre_ssa_id}: #{ins.opcode}: [#{ins.operands[0]}] [#{ins.operands[1]}] [#{ins.operands[2]}] replacing #{reg} with #{new_reg}" if $debug
+				end
 		    		ins.operands[i] = "(#{ new_reg })"
 
 			    elsif ins.operands[i][-1] == "$"
@@ -890,15 +904,17 @@ class Function
 					    done = true
 					end
 				    end
-		    	    	    #puts "processing ssa use #{ins.opcode} #{ins.operands.join(' ')} with var #{var} old_reg #{old_reg} new_reg #{new_reg}"
+		    	    	    #puts "id #{ins.id}: processing ssa use #{ins.opcode} #{ins.operands.join(' ')} with var #{var} old_reg #{old_reg} new_reg #{new_reg}"
 		    	    	    ins.operands[i] = new_reg
 		    	    	end
 		    	    end
 
 		    	else
-		    	    #puts "What do I do with #{ins.opcode} #{ins.operands[i]}"
+		    	    puts "id #{ins.id}: What do I do with #{ins.opcode} #{ins.operands[i]}" if $debug
 		    	end
 		    end
+		    puts "id #{ins.id}/#{ins.pre_ssa_id} after: #{ins.opcode}: [#{ins.operands[0]}] [#{ins.operands[1]}] [#{ins.operands[2]}]" if $debug
+
 		end
 	    end
 	    
@@ -908,6 +924,17 @@ class Function
 	    end
 	end
 
+	private
+	def print_symbol_table
+    	    # dump symbol table
+	    if $debug
+		puts "Current symbol table: {"
+		@symbol_table.each do |key, value|
+		    puts "      symbol #{key} => #{value}"
+		end
+		puts "   }"
+	    end
+	end
 
 	public
 	def convert_from_ssa( initial_index )
@@ -935,27 +962,36 @@ class Function
 		@symbol_table[ strip_address(v) + '$' ] = v.split(':')[0]
 		@symbol_table[ strip_address(v) + '$0' ] = v.split(':')[0]
 	    end
+	    print_symbol_table
 
 	    # add noops if we have empty blocks for looks
 	    insert_empty_block_noops( @doms[0] )
 
 	    # turn phi nodes into variable reads/writes
+	    puts "Inserting SSA reads...." if $debug
 	    insert_ssa_reads(@doms[0])
+
+	    puts "Inserting SSA writes...." if $debug
 	    insert_ssa_writes(@doms[0])
+	    print_symbol_table
 	    
 	    # turn ssa defs into registers
+	    puts "Converting SSA moves...." if $debug
 	    convert_ssa_moves(@doms[0])
+	    print_symbol_table
+
+	    # bbs.each do |bb|
+	    # 	bb.instructions.each do |ins|
+	    # 	    puts "hi: #{ins.id}: #{ins.opcode}"
+	    # 	end
+	    # end
+
 
 	    # renumber instructions
+	    puts "Renumbering instructions...." if $debug
 	    @new_instruction_index = initial_index
 	    renumber_instructions(@doms[0])
-
-	    # dump symbol table
-	    if false
-		@symbol_table.each do |key, value|
-		    puts "symbol #{key} => #{value}"
-		end
-	    end
+	    print_symbol_table
 
 	    # dump instruction mapping
 	    if false
@@ -1118,7 +1154,12 @@ class Function
 				end
 			end
 		end
+		this_id = b.id
+	    if to_be_deleted.size > 0
+		puts "VN: Visiting BB #{this_id} with #{b.instructions.size} instructions to_be_deleted #{ to_be_deleted.size }" if $debug
+	    end
 		to_be_deleted.each do |i|
+		#puts "VN: Preparing deletion for instruction #{ b.instructions[i].id } index #{i} bb id #{ b.id } len #{ b.instructions.size }"
 			@bbs.each do |bb|
 				bb.instructions.each_index do |j|
 					if bb.instructions[j] != nil
@@ -1157,7 +1198,12 @@ class Function
 			@n_expr_eliminated += 1
 			b.instructions[i] = nil
 		end
+	    #puts "At #{ b.id }, deleting"
 		b.instructions.delete(nil)
+	    if to_be_deleted.size > 0
+		puts "VN: Done visiting BB #{this_id} with #{b.instructions.size} " if $debug
+	    end
+	    #puts "BB #{ this_id } instructions"
 		b.sucs.each do |succ|
 			adjust_phis(succ, b)
 		end
@@ -1296,6 +1342,7 @@ class Function
 									end
 								end
 							end
+				puts "Deleting instruction #{bb.instructions[i].id} in simple constant propagation (1)" if $debug
 							bb.instructions.delete_at i
 						end
 						bb.phi.each_key do |key|
@@ -1309,6 +1356,7 @@ class Function
 					if (s.opcode != "blbc") && (s.opcode != "blbs")
 						target = "(" + s.id.to_s + ")"
 						result = eval_expr s
+					    puts "scp id #{s.id}/#{s.pre_ssa_id}: #{s.opcode} target #{target} result #{result}" if $debug
 						@bbs.each do |bb|
 							to_be_deleted = []
 							bb.instructions.each_index do |i|
@@ -1352,6 +1400,7 @@ class Function
 	def replace_by(inst, from, to)
 		changed = false
 		if ((inst.opcode == "blbc") || (inst.opcode == "blbs")) && (inst.bl_operand == from)
+		    puts "scp id #{inst.id}/#{inst.pre_ssa_id}: #{inst.opcode} from #{from.to_s} to #{to.to_s}" if $debug
 			inst.bl_operand = to.to_s
 			inst.operands[0] = to.to_s
 			inst.inst_str[3] = to.to_s
