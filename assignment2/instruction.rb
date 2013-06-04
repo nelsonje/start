@@ -109,19 +109,29 @@ class Instruction
   end
 
   def codegen(f)
+      extra = ""
+      # for hand-debugging (won't run)
+      #extra = "/#{pre_ssa_id}"
+
       case @opcode
       when  "method", "global", "type"
 	  "#{ @inst_str.join(' ') }"
       when "blbc", "blbs"
-	  # TODO doesn't quite work if these ops take constant arguments
-	  "instr #{id}: #{@opcode} (#{ @operands[0] }) [#{ @operands[1] }]" # (#{ @inst_str.join(' ') }) "
+	  # operand may be register, integer constant, or boolean constant
+	  str = @operands[0].to_s
+	  if @bl_operand.include?("(")
+	      str = "(" + str + ")"
+	  elsif @operands[0] == "false"
+	      str = "0"
+	  elsif @operands[0] == "true"
+	      str = "1"
+	  end
+	  "instr #{id}#{extra}: #{@opcode} #{ str } [#{ @operands[1] }]" # (#{ @inst_str.join(' ') }) "
       when "br", "call"
 	  # TODO doesn't quite work if these ops take constant arguments
-	  "instr #{id}: #{@opcode} [#{ @operands[0] }]" # (#{ @inst_str.join(' ') }) "
+	  "instr #{id}#{extra}: #{@opcode} [#{ @operands[0] }]"
       else
-	  #"#{ @inst_str.join(' ') }"
-	  "instr #{id}: #{@opcode} #{ @operands.join(' ') }" # (#{ @inst_str.join(' ') })"
-	  #"instr #{id}: #{@opcode} #{ @operands.join(' ') }" # (#{ @inst_str.join(' ') })"
+	  "instr #{id}#{extra}: #{@opcode} #{ @operands.join(' ') }"
       end
   end
 
