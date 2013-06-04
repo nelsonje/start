@@ -1,3 +1,5 @@
 examples/*.dot
 examples/*.txt
 examples/*.pdf
+packages
+pubspec.lock

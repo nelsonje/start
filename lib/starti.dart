@@ -1,6 +1,6 @@
 library starti;
 
-import 'dart:typeddata';
+import 'dart:typed_data';
 
 // The machine word size.  This must match the value in startc.
 const WORD_SIZE = 4;
@@ -32,11 +32,15 @@ void _check(bool flag, String message) {
 
 int cost(String opc) {
   final costMap = {
+    "nop": 0,
     "new": 10,
     "lddynamic": 100,
     "stdynamic": 100,
     "box": 12,
     "unbox": 3,
+    "istype": 2,
+    "checktype": 2,
+    "checkbounds": 3,
   };
   if (costMap.containsKey(opc)) {
     return costMap[opc];
@@ -82,12 +86,13 @@ class Type {
   int get size => fieldMap.length * WORD_SIZE + WORD_SIZE;
 }
 
-int _parse(String bytecode, List<Instruction> instructions) {
+int _parse(String bytecode, List<Instruction> instructions, Map<dynamic, int> counters) {
   int entrypc;
   // Read in the program from stdin
   for (final line in bytecode.split('\n')) {
     var words = line.trim().split(" ");
     if (line.trim() == "") continue;
+    if (words[0][0] == "#") continue;
     if (words[0] == "type") {
       final typename = words[1].substring(0, words[1].length-1);
       final type = new Type(typename, words.sublist(2));
@@ -101,6 +106,11 @@ int _parse(String bytecode, List<Instruction> instructions) {
     final opcode = words[2];
     final args = words.sublist(3, words.length);
     instructions.add(new Instruction(opcode, args));
+    if (opcode == "count" && args[0][0] == r'$') {
+      // Static counters will show count of 0 if not executed.
+      final counterId = args[0].substring(1, args[0].length);
+      counters[counterId] = 0;
+    }
     if (opcode == "entrypc")
       entrypc = instructions.length;
   }
@@ -118,7 +128,7 @@ class Memory {
   static const STACK_WORD_SIZE = STACK_SIZE ~/ WORD_SIZE;
 
   // Amount of heap space in bytes and longs.
-  static const HEAP_SIZE = 1048576;
+  static const HEAP_SIZE = 16777216;
   static const HEAP_WORD_SIZE = HEAP_SIZE ~/ WORD_SIZE;
 
   static const MEMORY_WORD_SIZE = GLOBAL_DATA_WORD_SIZE + STACK_WORD_SIZE
@@ -289,23 +299,28 @@ int resolveOperand(Memory memory, RegisterStack reg, String operand) {
     // TODO(vsm): Delete this and clean up base above.
     return memory.load(memory.fp+offset);
   } else if (operand[0] == "(")
-    return reg[int.parse(operand.slice(1,-1))];
+    return reg[int.parse(operand.substring(1, operand.length - 1))];
   else if (operand[0] == "[")
-    return int.parse(operand.slice(1,-1));
+    return int.parse(operand.substring(1, operand.length - 1));
   else
     return int.parse(operand);
 }
 
 String execute(String bytecode, { bool debug: false }) {
   // Builtin types.
+  Type.idMap = new Map();
+  Type.typeMap = new Map();
+  Type._idgen = 0;
   final inttype = new Type("int", []);
   final booltype = new Type("bool", []);
   final listtype = new Type("List", ["length#$WORD_SIZE:int"]);
   final boxedIntType = new Type("Integer", ["value#$WORD_SIZE:int"]);
+  final dynamicType = new Type("dynamic", []);
 
   // Instructions indexed by pc-1
   final instructions = [];
-  final entrypc = _parse(bytecode, instructions);
+  final counters = new Map<dynamic, int>();
+  final entrypc = _parse(bytecode, instructions, counters);
 
   final memory = new Memory();
   final reg = new RegisterStack();
@@ -402,6 +417,19 @@ String execute(String bytecode, { bool debug: false }) {
       reg[pc] = (op(args[0]) < op(args[1])) ? 1 : 0;
     else if (opc == "isnull")
       reg[pc] = (op(args[0]) == 0) ? 1 : 0;
+    else if (opc == "istype") {
+      final ref = op(args[0]);
+      if (ref == 0) {
+        // Null is always false.
+        reg[pc] = 0;
+      } else {
+        final reftypeid = memory.load(ref);
+        final typename = args[1].split("_type")[0];
+        final type = Type.typeMap[typename];
+        final match = (type == dynamicType) ? true : (type.id == reftypeid);
+        reg[pc] =  match ? 1 : 0;
+      }
+    }
     else if (opc == "br")
       pc = op(args[0]) - 1;
     else if (opc == "blbc")
@@ -588,6 +616,19 @@ String execute(String bytecode, { bool debug: false }) {
     }
     else if ((opc == "entrypc") || (opc == "nop"))
       pc = pc;
+    else if (opc == "count") {
+      var counterId = args[0];
+      if (counterId[0] != r'$') {
+        // If the counterId doesn't start with a $ then unpack it.
+        counterId = op(counterId);
+      } else {
+        // Trim the quotes around the arg name.
+        counterId = counterId.substring(1, counterId.length);
+      }
+      if (!counters.containsKey(counterId))
+        counters[counterId] = 0;
+      counters[counterId]++;
+    }
     else
       _check(false, "Unknown opcode $opc");
     if (debug && reg._current != null)
@@ -602,5 +643,24 @@ String execute(String bytecode, { bool debug: false }) {
 - Branch mispredicts : $branchMispredicts
 - Allocated bytes: ${memory._allocatedBytes}
 """;
-  return stats;
+  var counts = "";
+  if (!counters.isEmpty) {
+    counts = "- Counts : ";
+    var keys = counters.keys.toList();
+    var counterCompare = (a, b) {
+      // Sort nums ahead of strings.
+      if (a is num && b is! num) {
+        return -1;
+      } else if (a is! num && b is num) {
+        return 1;
+      } else {
+        return Comparable.compare(a, b);
+      }
+    };
+    keys.sort(counterCompare);
+    for (var key in keys) {
+      counts += "\n  $key: ${counters[key]}";
+    }
+  }
+  return stats + counts;
 }

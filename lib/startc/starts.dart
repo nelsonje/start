@@ -19,6 +19,8 @@ const TOKEN_LSS = const Token._('lss');
 const TOKEN_LEQ = const Token._('leq');
 const TOKEN_GTR = const Token._('gtr');
 const TOKEN_GEQ = const Token._('geq');
+const TOKEN_IS = const Token._('is');
+const TOKEN_ISNOT = const Token._('isnot');
 const TOKEN_PERIOD = const Token._('period');
 const TOKEN_COMMA = const Token._('comma');
 const TOKEN_RPAREN = const Token._('rparen');
@@ -39,7 +41,7 @@ const TOKEN_VOID = const Token._('void');
 const TOKEN_EOF = const Token._('eof');
 const TOKEN_NEW = const Token._('new');
 
-const MAX_ID_LENGTH = 16;
+const MAX_ID_LENGTH = 64;
 
 int _currentAsInt = null;
 int get currentAsInt {
@@ -276,6 +278,13 @@ Token nextToken()
         identifier();
         if (strcmp(currentAsString, "if") == 0) {
           sym = TOKEN_IF;
+        } else if (strcmp(currentAsString, "is") == 0) {
+          if (_ch != _int('!')) {
+            sym = TOKEN_IS;
+          } else {
+            sym = TOKEN_ISNOT;
+            _ch = getc(_script);
+          }
         } else if (strcmp(currentAsString, "import") == 0) {
           commentLine();
           sym = nextToken();
@@ -322,6 +331,7 @@ Token nextToken()
 void initializeTokenizer(String script)
 {
   _line = 0;
+  _position = 0;
   _script = script;
   if (_script == null) error("could not open file");
   _line = 1;

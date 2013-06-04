@@ -12,6 +12,7 @@ final TESTS = [
                 'link.dart',
                 'mmm.dart',
                 'prime.dart',
+                'rational.dart',
                 'regslarge.dart',
                 'sieve.dart',
                 'sort.dart',
@@ -33,8 +34,8 @@ void main() {
   final options = new Options();
   final vm = options.executable;
   final script = options.script;
-  Future<String> dir = new File(script).directory().then((d) => d.path);
-  dir.then((path) => runTests(vm, '$path/..'));
+  String path = new File(script).directory.path;
+  runTests(vm, '$path/..');
 }
 
 void runTests(String vm, String path) {
