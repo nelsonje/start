@@ -712,13 +712,13 @@ class Function
 		@new_instruction_index += 1
 
 		# update new-to-old map
-		puts "Adding mapping from old #{i.id} to new #{i.post_ssa_id}"
+		puts "Adding mapping from old #{i.id} to new #{i.post_ssa_id}" if $debug
 		@instruction_map[i.id] = i.post_ssa_id
 	    end
 	    
 	    # recurse
     	    bb.idominates.each do |y|
-	    	renumber_instructions y if bb != y
+	    	fix_branch_targets y if bb != y
 	    end
 	end
 
@@ -745,7 +745,7 @@ class Function
 
 	private
 	def insert_empty_block_noops( bb )
-	    if bb.instructions.length == 0
+	    if bb.instructions.length == 0 and false
 		mh = "instr #{@new_instruction_index}: nop"
 		bb.instructions.push Instruction.new(mh.scan(/[^\s]+/))
 		@new_instruction_index += 1
@@ -1119,6 +1119,13 @@ class Function
 								bb.instructions[j].operands[0] = Integer(dest[0])
 								bb.instructions[j].inst_str[3] = @vn[b.instructions[i].expr[0]]
 							end
+# 						when "br"
+# #						    puts "At #{ bb.instructions[j].id }: #{ bb.instructions[j].opcode }"
+# 							if bb.instructions[j].inst_str[2] == b.instructions[i].expr[0]
+# 								dest = @vn[b.instructions[i].expr[0]].scan(/[\d]+/)
+# 								bb.instructions[j].operands[0] = Integer(dest[0])
+# 								bb.instructions[j].inst_str[2] = @vn[b.instructions[i].expr[0]]
+# 							end
 						when "istype", "checktype", "lddynamic", "isnull", "load", "checknull", "write", "param"
 							if bb.instructions[j].inst_str[3] == b.instructions[i].expr[0]
 								bb.instructions[j].operands[0] = @vn[b.instructions[i].expr[0]]
@@ -1304,6 +1311,8 @@ class Function
 							end
 							to_be_deleted.each do |i|
 								bb.preds.each do |pred|
+					# unnecessary with new BB-map-based branch target resolution
+					if false
 									last = pred.instructions.last
 									case last.opcode
 									when "call", "br"
@@ -1317,7 +1326,9 @@ class Function
 											last.inst_str[4] = "[" + last.operands[1].to_s + "]"
 										end
 								end
+					end
 							end
+				    puts "Deleting instruction #{bb.instructions[i].id} in simple constant propagation (2)" if $debug
 							bb.instructions.delete_at i
 							end
 						end
