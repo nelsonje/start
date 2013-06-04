@@ -30,6 +30,14 @@ class BasicBlock
     end
   end
 
+  def pre_ssa_id
+    if @instructions.empty?
+      return -1
+    else
+      return instructions[0].pre_ssa_id
+    end
+  end
+
   def ignore
     if @instructions.empty?
       return false

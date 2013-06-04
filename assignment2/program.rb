@@ -112,7 +112,7 @@ class Program
       file.puts "entry [label=\"Entry\"];"
       for i in 0...f.bbs.length
 	  if f.bbs[i].id != -1
-        file.print("n" + i.to_s + " [label=\"{BB " + f.bbs[i].id.to_s + " (idom: ")
+        file.print("n" + i.to_s + " [label=\"{BB " + f.bbs[i].id.to_s + "/" + f.bbs[i].pre_ssa_id.to_s + " (idom: ")
 	if f.bbs[i].idom  == nil
 		file.print("none")
 	else
