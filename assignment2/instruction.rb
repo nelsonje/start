@@ -61,7 +61,7 @@ class Instruction
     when "sub", "add", "mul", "div", "mod", "cmpeq", "cmple", "cmplt", "istype", "store", "move", "checkbounds", "checktype", "lddynamic"
     	@operands.push inst[3]
     	@operands.push inst[4]
-    when "isnull", "load", "new", "newlist", "checknull", "write", "param"
+    when "isnull", "load", "new", "newlist", "checknull", "write", "param", "count"
     	@operands.push inst[3]
     when "stdynamic"
     	@operands.push inst[3]

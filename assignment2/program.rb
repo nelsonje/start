@@ -19,8 +19,18 @@ class Program
     @doms = []
 
     @last_inst_id = 0
+    @last_counter = 0
     
   end
+
+	public
+	def instrument
+  		@functions.each do |name, f|
+			ret = f.instrument(@last_inst_id, @last_counter)
+			@last_inst_id = ret[0]
+			@last_counter = ret[1]
+		end
+	end
 
   public
   def to_ssa

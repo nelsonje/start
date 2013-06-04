@@ -44,6 +44,40 @@ class Function
 
   end
 
+  public
+  def instrument(last_id, last_counter)
+  	#Instrumenting function calls
+	@bbs.each do |bb|
+		call_indexes = []
+		bb.instructions.each_index do |idx|
+			call_indexes.push idx if bb.instructions[idx].opcode == "call"
+		end
+		n_inserted = 0
+		if !call_indexes.empty?
+			p "Before"
+			bb.instructions.each do |inst|
+				p inst.inst_str
+			end
+		end
+		call_indexes.each do |idx|
+			last_counter += 1
+			last_id += 1
+			new_inst_str = "instr #{last_id}: count #{last_counter}"
+    			new_inst_str = new_inst_str.scan(/[^\s]+/)
+			new_inst = Instruction.new(new_inst_str)
+			bb.instructions.insert(idx + n_inserted, new_inst)
+			n_inserted += 1
+		end
+		if !call_indexes.empty?
+			p "After"
+			bb.instructions.each do |inst|
+				p inst.inst_str
+			end
+		end
+	end
+	[last_id, last_counter]
+  end
+
   private
   def push_var( var, inst )
       if $debug
