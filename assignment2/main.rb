@@ -9,11 +9,11 @@ ir_enabled = true
 bssa_enabled = true
 report_enabled = true
 
-$debug_print = false
+$debug = false
 
 ARGV.each do |str|
     if str.include? "-debug"
-	$debug_print = true
+	$debug = true
     end
 
     if str.include? "-opt="
@@ -63,9 +63,6 @@ if scp_enabled and not ssa_enabled
     abort "Simple constant propagation requires SSA to be enabled."
 end
 
-
-# enable logging
-$debug = false
 
 p = Program.new
 p.read_program( ARGV[0] )
