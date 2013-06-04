@@ -513,34 +513,87 @@ class Function
 	    nodes
 	end
 
+	private
+	def is_register?( operand )
+	    return operand.include?("(")
+	end
+
+	private
+	def is_true_or_false?( operand )
+	    return (operand == "true" or
+		    operand == "false")
+	end
+
+	private
+	def is_constant?( operand )
+	    return (is_true_or_false?( operand ) or
+		    # reject all strings that contain something other than digits
+		    ( not operand.scan(/[0-9]/).empty? and operand.scan(/[^0-9]/).empty? ) )
+	end
+
 	# turn moves to ssa variables into register operations
 	private
 	def convert_ssa_moves( bb )
-
+	    puts "convert_ssa_moves for bb #{bb.id}: #{bb.instructions[0].opcode}" if $debug
 	    bb.instructions.each_index do |i|
 		ins = bb.instructions[i]
-		# if it's a move
-		if ins.opcode == "move"
-		    # to an ssa variable
-		    if ins.operands[1].include?("$") and not ins.operands[1].include?("#")
-			# insert into symbol table
-			#puts "Inserting (moves) @symbol_table[ #{ins.operands[1]} ] = #{ins.operands[0]}"
-			@symbol_table[ ins.operands[1] ] = ins.operands[0].to_s
-		
-			# might this be a jump target? if so, make it a nop instead of deleting.
-			if i == 0 and bb.instructions.length < 2
-			    mh = "instr #{ins.id}: nop"
-			    bb.instructions[i].reset( mh.scan(/[^\s]+/) )
+
+		# if it's a move to an ssa variable
+		if ins.opcode == "move" and ins.operands[1].include?("$") and not ins.operands[1].include?("#")
+		    puts "checking id #{ins.id}/#{ins.pre_ssa_id}: #{ins.opcode} #{ins.operands}" if $debug
+
+		    # from a register
+		    if is_register?( ins.operands[0] ) or is_constant?( ins.operands[0] )
+#		    if ins.operands[1].include?("$") and not ins.operands[1].include?("#")
+
+			puts "found register-to-SSA move at id #{ins.id}/#{ins.pre_ssa_id}: #{ins.opcode} #{ins.operands}" if $debug
+
+			if true
+			    # insert into symbol table
+			    puts "id #{ins.id}/#{ins.pre_ssa_id}: Inserting (moves) @symbol_table[ #{ins.operands[1]} ] = #{ins.operands[0]}" if $debug
+			    @symbol_table[ ins.operands[1] ] = ins.operands[0].to_s
+			    
+			    # might this be a jump target? if so, make it a nop instead of deleting.
+			    if i == 0 and bb.instructions.length < 2 and false
+				mh = "instr #{ins.id}: nop"
+				bb.instructions[i].reset( mh.scan(/[^\s]+/) )
+			    else
+				# remove instruction
+				puts "Deleting instruction #{bb.instructions[i].id} in de-ssa conversion" if $debug
+				#bb.instructions.delete_at(i)
+				# mark for deletion
+				bb.instructions[i] = nil
+			    end
 			else
-			    # remove instruction
-			    bb.instructions.delete_at(i)
+			    # it's a move to an ssa variable: convert to load
+			    puts "id #{ins.id}/#{ins.pre_ssa_id}: Converting move to #{ins.operands[0]} to load from #{ins.operands[1]}" if $debug
+			    ins.opcode = "add"
+			    @symbol_table[ ins.operands[1] ] = "(" + ins.id.to_s + ")"
+			    ins.operands[1] = "0"
 			end
+
+
+			# from another ssa variable 
+		    elsif ins.operands[0].include?("$") and not ins.operands[0].include?("#")
+			puts "found ssa-to-SSA move at id #{ins.id}/#{ins.pre_ssa_id}: #{ins.opcode} #{ins.operands}" if $debug
+			# is a move to an ssa variable from another ssa variable
+			# so convert to load
+			puts "id #{ins.id}/#{ins.pre_ssa_id}: Converting move to #{ins.operands[1]} to load from #{ins.operands[0]}" if $debug
+			ins.opcode = "add"
+			@symbol_table[ ins.operands[1] ] = "(" + ins.id.to_s + ")"
+			ins.operands[1] = "0"
+		    # elsif ins.operands[1].include?("$") and not ins.operands[1].include?("#")
+		    # 	puts "foo"
 		    end
 		end
 	    end
 
+	    # delete marked instructions
+	    bb.instructions.delete(nil)
+
 	    # recurse down dominator tree
 	    bb.idominates.each do |y|
+		puts "maybe convert_ssa_moves for bb #{y.id} from bb #{bb.id}: #{y.instructions[0].opcode}" if $debug
 	    	convert_ssa_moves y if bb != y
 	    end
 
@@ -562,17 +615,25 @@ class Function
 		phi_variable_name = "__#{variable_name}$#{key}#" + @new_variable_index.to_s
 		@phi_variables[key] = phi_variable_name
 
-		#puts "In bb #{bb.id}, adding read from #{phi_variable_name}"
-		line = "instr #{@new_instruction_index}: move #{phi_variable_name} #{value[0]}"
-		inst = line.scan(/[^\s]+/)
-		bb.instructions.unshift Instruction.new( inst )
+		# insert new instruction
+		if true
+		    #line = "instr #{@new_instruction_index}: move #{phi_variable_name} #{value[0]}"
+		    line = "instr #{@new_instruction_index}: add #{phi_variable_name} 0"
+		    inst = line.scan(/[^\s]+/)
+		    bb.instructions.unshift Instruction.new( inst )
+		    puts "In bb #{bb.id}, adding read from #{phi_variable_name} instruction #{inst}" if $debug
 
-		# insert this ssa variable's name and register number in symbol table
-		reg = '(' + @new_instruction_index.to_s + ')'
-		#puts "Inserting (reads) @symbol_table[ #{value[0]} ] = #{reg}"
-		@symbol_table[ value[0] ] = reg
+		    # insert this ssa variable's name and register number in symbol table
+		    reg = '(' + @new_instruction_index.to_s + ')'
+		    puts "Inserting (reads) @symbol_table[ #{value[0]} ] = #{reg}" if $debug
+		    @symbol_table[ value[0] ] = reg
 
-		@new_instruction_index += 1
+		    @new_instruction_index += 1
+		else 
+		    # insert this ssa variable's name and register number in symbol table
+		    puts "Inserting (reads) @symbol_table[ #{value[0]} ] = #{phi_variable_name}" if $debug
+		    @symbol_table[ value[0] ] = phi_variable_name
+		end
 
 		# todo more types?
 		@ssa_temp_vars.push phi_variable_name + ":int"
