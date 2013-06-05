@@ -95,7 +95,12 @@ class Program
             file.print bb.sucs[index].id.to_s
           end
         end
-        file.print("\nImmediate dominator: " + bb.idom.id.to_s + "\n\n\n") 
+	if bb.idom
+	    idom = bb.idom.id.to_s
+	else
+	    idom = "none"
+	end
+        file.print("\nImmediate dominator: " + idom + "\n\n\n")
       end
       file.close
     end
