@@ -63,6 +63,23 @@
     instr 56: sub (55) 23 :int
     instr 57: write (56)
     instr 58: wrl
-    instr 59: ret 0
-    instr 60: nop
+    instr 59: new Integer_type#8 :Integer
+    instr 60: add (59) value_offset#4 :int*
+    instr 61: store 42 (60)
+    instr 62: istype (59) Integer_type#8 :bool
+    instr 63: blbc (62) [74]
+    instr 64: add b_base#32764 GP :dynamic*
+    instr 65: load (64) :dynamic
+    instr 66: checknull (65) :dynamic
+    instr 67: lddynamic (66) y_offset#? :dynamic
+    instr 68: checknull (67) :dynamic
+    instr 69: checktype (68) Integer_type#8 :Integer
+    instr 70: add (69) value_offset#4 :int*
+    instr 71: load (70) :int
+    instr 72: write (71)
+    instr 73: wrl
+    instr 74: write 7
+    instr 75: wrl
+    instr 76: ret 0
+    instr 77: nop
 
