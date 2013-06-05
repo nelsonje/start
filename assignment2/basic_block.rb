@@ -1,5 +1,5 @@
 class BasicBlock
-  attr_accessor :sucs, :preds, :instructions, :id, :visited, :topo_id, :postorder_id, :dom_processed, :idom, :idominates, :df, :phi
+  attr_accessor :sucs, :preds, :instructions, :id, :visited, :topo_id, :postorder_id, :dom_processed, :idom, :idominates, :df, :phi, :original_id, :count
 
   def initialize(insts, first, last)
     @sucs = []
@@ -19,6 +19,9 @@ class BasicBlock
     @df = []
     #Phi instructions
     @phi = {}
+
+      @original_id = -1
+      @count = 0
   end
 
 

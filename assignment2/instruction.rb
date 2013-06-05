@@ -1,5 +1,5 @@
 class Instruction
-  attr_accessor   :id, :opcode, :operands, :rhs, :lhs, :ssa_mod_operands, :expr, :bb, :bl_operand, :pre_ssa_id, :post_ssa_id
+  attr_accessor   :id, :opcode, :operands, :rhs, :lhs, :ssa_mod_operands, :expr, :bb, :bl_operand, :pre_ssa_id, :post_ssa_id, :likely_type_id, :fields
   attr_reader     :inst_str, :nop
 
   def initialize(inst)
@@ -21,6 +21,17 @@ class Instruction
       else 
         @nop = false
       end
+    elsif inst[0] == "type"
+	@opcode = inst[0]
+	@id = inst[1].chomp(":")
+	# parse type line and build field map
+	@fields = {}
+	inst.each do |s|
+	      if s.include?("#")
+		  a = s.split(/:|#/)
+		  @fields[ a[0] ] = a[1]
+	      end
+	  end
     else
       @opcode = inst[0]
       @id = -1
@@ -33,7 +44,7 @@ class Instruction
       @pre_ssa_id = id
       @post_ssa_id = -1
 
-
+      @likely_type_id = nil
 
     #TODO
     #Unknown instructions' semantics

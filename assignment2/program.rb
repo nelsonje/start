@@ -5,6 +5,7 @@ require_relative 'basic_block'
 class Program
   def initialize
     @instructions = [nil]
+      @types = ["int", "bool", "List", "Integer", "dynamic" ]
     @header = []
     
     # maps name of function to index of first instruction
@@ -36,6 +37,13 @@ class Program
   def to_ssa
   	@functions.each do |name, f|
 		@last_inst_id = f.to_ssa(@last_inst_id)
+	end
+  end
+
+  public
+  def capture_bb_map
+  	@functions.each do |name, f|
+	  f.build_bb_map
 	end
   end
 
@@ -133,7 +141,7 @@ class Program
 	file.print(" empty") if f.bbs[i].df.empty?
 	f.bbs[i].df.each {|bb| file.print(" " + bb.id.to_s)}
 	file.print("|")
-
+	      file.print("count: #{ f.bbs[i].count }|")
 
 	phi_counter = 0
 	f.bbs[i].phi.each do |var, options|
@@ -214,6 +222,8 @@ class Program
     if inst[0] == "instr"
       @instructions.push(i)
       @last_inst_id = Integer(inst[1].chomp(':'))
+    elsif inst[0] == "type"
+	@types.push(i)
     else
 	# any non-blank lines are header instructions
 	if ! i.inst_str.empty?
@@ -351,6 +361,64 @@ class Program
 
       file.close
   end
+
+  def parse_profile filename
+      bb_count_map = {}
+      likely_type_map = {}
+
+      file = File.new(filename, "r")
+      file.each_line do |line|
+	  elems = line.split(":")
+
+	  id = elems[0].to_i
+	  count = elems[1].to_i
+
+	  lower_id = id & 0xffff
+	  upper_id = id >> 16
+
+	  puts "Reading profile count upper #{upper_id} and lower #{lower_id} from #{line}" if $debug
+
+	  # capture basic block profile counts
+	  if upper_id != 0 
+	      if lower_id == 0
+		  bb_count_map[ upper_id ] = count
+	      else
+		  # capture type profiling
+		  if likely_type_map[ upper_id ].nil?
+		      likely_type_map[ upper_id ] = {}
+		  end
+		  likely_type_map[ upper_id ][ lower_id ] = count
+	      end
+	  end
+      end
+      file.close
+
+      # process type profiling info
+      @functions.each do |name, f|
+	  f.bbs.each do |bb|
+	      bb.count = bb_count_map[ bb.original_id ]
+	      bb.instructions.each do |ins|
+		  if likely_type_map.has_key?( ins.id )
+		      count = 0
+		      type = nil
+		      likely_type_map[ ins.id ].each do |key, value|
+		      	  if count < value
+		      	      type = key
+		      	  end
+		      end
+		      puts "Adding likely type #{type} to #{ ins.id }: #{ ins.opcode }" if $debug
+		      ins.likely_type_id = type
+		  end
+	      end
+	  end
+
+	  # now specialize dynamic instructions
+	  ret = f.specialize_dynamic(@last_inst_id, @types)
+	  @last_inst_id = ret[0]
+      end
+
+  end
+
 
 end
 

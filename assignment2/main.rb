@@ -10,11 +10,17 @@ ir_enabled = true
 bssa_enabled = true
 report_enabled = true
 
+profile_filename = nil
 $debug = false
 
 ARGV.each do |str|
     if str.include? "-debug"
 	$debug = true
+    end
+
+    if str.include? "-profile="
+	opts = str.split('=')
+	profile_filename = opts[1]
     end
 
     if str.include? "-opt="
@@ -81,6 +87,10 @@ p.build_cfgs
 p.build_doms
 
 p.dump_info ARGV[0] if report_enabled
+
+p.capture_bb_map
+
+p.parse_profile profile_filename if profile_filename != nil
 
 p.instrument if profiling_enabled
 

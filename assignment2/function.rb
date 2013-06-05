@@ -46,14 +46,17 @@ class Function
 
   public
   def instrument(last_id, last_counter)
+      bb_ids = {}
+
   	#Instrumenting function calls
 	@bbs.each do |bb|
+	  bb_ids[ bb ] = bb.id
 		call_indexes = []
 		bb.instructions.each_index do |idx|
 			call_indexes.push idx if bb.instructions[idx].opcode == "call"
 		end
 		n_inserted = 0
-		if !call_indexes.empty?
+		if !call_indexes.empty? and $debug
 			p "Before"
 			bb.instructions.each do |inst|
 				p inst.inst_str
@@ -68,15 +71,117 @@ class Function
 			bb.instructions.insert(idx + n_inserted, new_inst)
 			n_inserted += 1
 		end
-		if !call_indexes.empty?
+		if !call_indexes.empty? and $debug
 			p "After"
 			bb.instructions.each do |inst|
 				p inst.inst_str
 			end
 		end
 	end
+      
+      if last_counter >= (1 << 16)
+	  puts "ERROR! too many instrumented instructions!"
+      end
+
+      if true
+	  # instrument basic blocks
+	  @bbs.each do |bb|
+	      last_id += 1
+	      counter_id = ( bb_ids[ bb ]  << 16 )
+	      if last_counter >= (1 << 32)
+		  puts "ERROR! too many total instructions!"
+	      end
+	      new_inst_str = "instr #{last_id}: count #{ counter_id }"
+	      new_inst_str = new_inst_str.scan(/[^\s]+/)
+	      new_inst = Instruction.new(new_inst_str)
+	      bb.instructions.insert(0, new_inst)
+	  end
+      end
+
+      if true
+	  # instrument dynamic
+	  @bbs.each do |bb|
+	      dynamic_indexes = []
+	      bb.instructions.each_index do |idx|
+		  dynamic_indexes.push idx if bb.instructions[idx].opcode.include?("dynamic")
+	      end
+
+	      n_inserted = 0
+	      dynamic_indexes.each do |idx|
+		  ins = bb.instructions[idx + n_inserted]
+		  puts "Processing #{ins.id}: #{ins.opcode} #{ins.operands[0]} #{ins.operands[1]} #{ins.operands[2]}"
+		  ld_or_st = 0
+		  if ins.opcode == "stdynamic"
+		      ld_or_st = 1
+		  end
+
+		  arg = ins.operands[ld_or_st]
+		  id = ins.id
+
+		  # get type
+		  last_id += 1
+		  new_inst_str = "instr #{last_id}: load #{arg} :int"
+		  new_inst_str = new_inst_str.scan(/[^\s]+/)
+		  new_inst = Instruction.new(new_inst_str)
+		  bb.instructions.insert(idx + n_inserted, new_inst)
+		  n_inserted += 1
+		  
+		  # add location
+		  last_id += 1
+		  counter_id = ( id << 16 )
+		  new_inst_str = "instr #{last_id}: add (#{last_id-1}) #{counter_id} :int"
+		  new_inst_str = new_inst_str.scan(/[^\s]+/)
+		  new_inst = Instruction.new(new_inst_str)
+		  bb.instructions.insert(idx + n_inserted, new_inst)
+		  n_inserted += 1
+		  
+		  # add count
+		  last_id += 1
+		  counter_id = ( id << 16 )
+		  new_inst_str = "instr #{last_id}: count (#{last_id-1})"
+		  new_inst_str = new_inst_str.scan(/[^\s]+/)
+		  new_inst = Instruction.new(new_inst_str)
+		  bb.instructions.insert(idx + n_inserted, new_inst)
+		  n_inserted += 1
+	      end
+	  end
+      end
+
 	[last_id, last_counter]
   end
+
+  public
+  def specialize_dynamic(last_id, types)
+      @bbs.each do |bb|
+	  dynamic_indexes = []
+	  bb.instructions.each_index do |idx|
+	      dynamic_indexes.push idx if bb.instructions[idx].opcode.include?("dynamic")
+	  end
+	  
+	  n_inserted = 0
+	  dynamic_indexes.each do |idx|
+	      ins = bb.instructions[idx + n_inserted]
+	      if not ins.likely_type_id.nil?
+		  type = types[ ins.likely_type_id ]
+		  typename = type.id
+		  field = ins.operands[2].split("_")[0]
+		  offset = type.fields[ field ]
+		  puts "Specializing #{ins.id}: #{ins.opcode} #{ins.operands[0]} #{ins.operands[1]} #{ins.operands[2]} to type #{ typename } offset #{ offset }" if $debug
+	      end
+
+	      # now create new basic block
+	      # move dynamic instruction there
+	      # add jump back when done
+	      # insert replacement squence:
+	      #   checktype
+	      #   branch to dynamic bb
+	      #   add offset to address
+	      #   load
+
+	  end
+      end
+  end
+
 
   private
   def push_var( var, inst )
@@ -86,6 +191,13 @@ class Function
       @vars.push var
   end
 
+  # public
+  # def capture_bb_map
+  #     # build map for later jump target adjustment
+  #     build_bb_map( @doms[0] )
+  #     #dump_bb_map
+  # end
+
   public
   def to_ssa(last_id)
 
@@ -94,10 +206,6 @@ class Function
 	last_id = place_phis(last_id)
 	rename_vars
       @new_instruction_index = last_id + 1
-
-      # build map for later jump target adjustment
-      build_bb_map( @doms[0] )
-      #dump_bb_map
 
 	last_id
   end
@@ -801,13 +909,11 @@ class Function
 	    end
 	end
 
-	private
-	def build_bb_map( bb )
-	    @bb_map[ bb.id ] = bb
-	    
-	    # recurse
-    	    bb.idominates.each do |y|
-	    	build_bb_map y if bb != y
+	public
+	def build_bb_map
+	    @bbs.each do |bb|
+		bb.original_id = bb.id
+		@bb_map[ bb.id ] = bb
 	    end
 	end
 
@@ -871,7 +977,11 @@ class Function
 		    new1 = @instruction_map[ t ]
 		    end
 
-		    new1 = @bb_map[ ins.operands[1] ].id
+		    if not @bb_map.has_key?( ins.operands[1] )
+			puts "Didn't find BB map entry for #{ ins.operands[1] }: #{ ins.opcode } should be near #{ @instruction_map[ ins.operands[1] ] }, using #{ @instruction_map[ ins.operands[1] ] } instead" if $debug
+		    else
+			new1 = @bb_map[ ins.operands[1] ].id
+		    end
 
 		    #puts "#{ins.opcode}: [#{ins.operands[0]}] [#{ins.operands[1]}] [#{new0}] [#{new1}]"
 		    ins.operands[0] = new0
