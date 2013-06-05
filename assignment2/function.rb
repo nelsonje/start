@@ -1361,6 +1361,8 @@ class Function
 							end
 						end
 						to_be_deleted.each do |i|
+					# unnecessary with new BB-map-based branch target resolution
+					if false
 							bb.preds.each do |pred|
 								last = pred.instructions.last
 								case last.opcode
@@ -1376,7 +1378,8 @@ class Function
 									end
 								end
 							end
-				puts "Deleting instruction #{bb.instructions[i].id} in simple constant propagation (1)" if $debug
+					end
+				puts "scp: Deleting instruction #{bb.instructions[i].id} in simple constant propagation (1)" if $debug
 							bb.instructions.delete_at i
 						end
 						bb.phi.each_key do |key|
@@ -1420,7 +1423,7 @@ class Function
 								end
 					end
 							end
-				    puts "Deleting instruction #{bb.instructions[i].id} in simple constant propagation (2)" if $debug
+				    puts "scp: Deleting instruction #{bb.instructions[i].id} in simple constant propagation (2)" if $debug
 							bb.instructions.delete_at i
 							end
 						end
@@ -1434,7 +1437,7 @@ class Function
 	def replace_by(inst, from, to)
 		changed = false
 		if ((inst.opcode == "blbc") || (inst.opcode == "blbs")) && (inst.bl_operand == from)
-		    puts "scp id #{inst.id}/#{inst.pre_ssa_id}: #{inst.opcode} from #{from.to_s} to #{to.to_s}" if $debug
+		    puts "scp changed id #{inst.id}/#{inst.pre_ssa_id}: #{inst.opcode} from #{from.to_s} to #{to.to_s}" if $debug
 			inst.bl_operand = to.to_s
 			inst.operands[0] = to.to_s
 			inst.inst_str[3] = to.to_s
@@ -1443,17 +1446,20 @@ class Function
 		case inst.opcode
 		when "sub", "add", "mul", "div", "mod", "cmpeq", "cmple", "cmplt", "stdynamic"
 			if inst.operands[0] == from
+			    puts "scp changed id #{inst.id}/#{inst.pre_ssa_id}: #{inst.opcode} from #{from.to_s} to #{to.to_s}" if $debug
 				inst.operands[0] = to
 				inst.inst_str[3] = to.to_s
 				changed = true
 			end
 			if inst.operands[1] == from
+			    puts "scp changed id #{inst.id}/#{inst.pre_ssa_id}: #{inst.opcode} from #{from.to_s} to #{to.to_s}" if $debug
 				inst.operands[1] = to
 				inst.inst_str[4] = to.to_s
 				changed = true
 			end
 		when "store", "move", "istype", "checkbounds", "checktype", "isnull", "checknull", "write", "param", "load", "lddynamic"
 			if inst.operands[0] == from
+			    puts "scp changed id #{inst.id}/#{inst.pre_ssa_id}: #{inst.opcode} from #{from.to_s} to #{to.to_s}" if $debug
 				inst.operands[0] = to
 				inst.inst_str[3] = to.to_s
 				changed = true
