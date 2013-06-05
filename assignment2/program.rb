@@ -224,6 +224,7 @@ class Program
       @last_inst_id = Integer(inst[1].chomp(':'))
     elsif inst[0] == "type"
 	@types.push(i)
+	@header.push(i)
     else
 	# any non-blank lines are header instructions
 	if ! i.inst_str.empty?
