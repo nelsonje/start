@@ -82,6 +82,8 @@ p.build_doms
 
 p.dump_info ARGV[0] if report_enabled
 
+p.instrument if profiling_enabled
+
 p.to_ssa if ssa_enabled
 
 p.scp if scp_enabled
@@ -89,8 +91,6 @@ p.report_gen_scp if scp_enabled and report_enabled
 
 p.gcse if cse_enabled
 p.report_gen_gcse if cse_enabled and report_enabled
-
-p.instrument if profiling_enabled
 
 p.from_ssa if bssa_enabled
 
