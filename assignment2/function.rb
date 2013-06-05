@@ -83,7 +83,7 @@ class Function
 	  puts "ERROR! too many instrumented instructions!"
       end
 
-      if true
+      if false
 	  # instrument basic blocks
 	  @bbs.each do |bb|
 	      last_id += 1
