@@ -644,7 +644,6 @@ class Function
 
   public
   def find_doms
-  is_recursive
     
     # compute order
     find_topo_order
