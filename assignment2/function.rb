@@ -44,6 +44,125 @@ class Function
 
   end
 
+	public
+	def is_recursive
+		start_addr = @method_header.operands[1]
+		result = false
+		@bbs.each do |bb|
+			bb.instructions.each do |inst|
+				result = true if (inst.opcode == "call") && (inst.operands[0] == start_addr)
+			end
+		end
+		result
+	end
+
+	private
+	def get_params_locals f
+		header = f.method_header
+		params = []
+		locals = []
+		for i in 2...header.inst_str.length
+			new_str =  header.inst_str[i]
+			# new_str = (new_str.split(":"))[0]
+			if new_str =~ "#-"
+				locals.push new_str.dup
+			else
+				params.push new_str.dup
+			end
+		end
+		[params, locals]
+	end
+
+	public
+	def inline(bb_idx, inst_idx, last_id, function)
+		bb = @bbs[bb_idx]
+
+		if bb.instructions[inst_idx-1].opcode != "count"
+			puts "\n\n\nUninstrumented call???\n\n\n"
+			5/0
+		end
+		# Delete the counter -- not needed anymore
+		bb.instructions.delete_at (inst_idx - 1)
+		inst_idx -= 1
+
+		# Get the parameters and the local variables of the
+		# functions that will be inlined here
+		params_locals = get_params_locals(function)
+		params = params_locals[0]
+		locals = params_locals[1]
+
+		map_new_locals = {}
+		# For each parameter of the function that will be inlined,
+		# create a new local variable in this function
+		params.each do |param|
+			@new_variable_index -= 4
+			new_var_name = "andre_var#" + @new_variable_index.to_s
+			map_new_locals[param] = new_var_name.dup + ":" + param.split(":")[1]
+		end
+		# For each local variable of the function that will be inlined,
+		# create a new local variable in this function
+		locals.each do |local|
+			@new_variable_index -= 4
+			new_var_name = "andre_var#" + @new_variable_index.to_s
+			map_new_locals[local] = new_var_name.dup + ":" + local.split(":")[1]
+		end
+
+		# Replace "param" by "moves"
+
+		i = inst_idx
+		j = params.length - 1
+		while j >= 0
+			i -= 1
+			while bb.instructions[i].opcode != "param"
+				i -= 1
+			end
+			# "i" now points to the next "param" instruction bottom-up
+
+			# Replace this "param" instruction by a "move"
+			new_move_str = "instr #{bb.instructions[i].id}: move #{bb.instructions[i].operands[0]} #{map_new_locals[params[j]].split(":")[0]}"
+			bb.instructions[i].reset( new_move_str.scan(/[^\s]+/) )
+
+			j -= 1
+		end
+
+		# Fix this function's "method" instruction to include the new locals
+		new_method = @method_header.inst_str.dup
+		new_vars = []
+		params.each do |param|
+			new_vars.push map_new_locals[param]
+		end
+		locals.each do |local|
+			new_vars.push map_new_locals[local]
+		end
+		new_vars.each do |var|
+			new_method.push var
+		end
+		@method_header.reset( new_method )
+
+		# Fix this function's "enter" and "return" instructions to allocate/free more space
+		@bbs.each do |b|
+			b.instructions.each do |i|
+				if (i.opcode == "enter") || (i.opcode == "ret")
+					i.inst_str[3] = i.operands[0] + 4*(params.length + locals.length)
+					i.reset( i.inst_str.dup )
+				end
+			end
+		end
+
+
+
+
+
+
+
+
+	end
+
+	public
+	def dynamic_inlining
+		#check if the counter is above threshold
+	end
+
   public
   def instrument(last_id, last_counter)
       bb_ids = {}
@@ -525,6 +644,7 @@ class Function
 
   public
   def find_doms
+  is_recursive
     
     # compute order
     find_topo_order

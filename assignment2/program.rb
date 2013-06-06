@@ -25,6 +25,278 @@ class Program
   end
 
 	public
+	def is_recursive(f_name)
+		start_addr = @functions_info[f_name]
+		result = false
+		start_idx = 0
+		@instructions.each_index do |i|
+			if @instructions[i].id == start_addr
+				if @instructions[i].opcode == "entrypc"
+					start_idx = i + 1
+				else if @instructions[i].opcode == "enter"
+					start_idx = i
+				else
+					puts "\n\nBug in is_recursive\n\n"
+					5/0
+				end
+			end
+		end
+		start_idx += 1
+		while (start_idx < @instructions.length) && (@instructions[start_idx].opcode != "enter") && (@instructions[start_idx].opcode != "entrypc")
+			result = true if (@instructions[start_idx].opcode == "call") && (@instructions[start_idx].operands[0] == start_addr)
+		end
+		result
+	end
+
+	private
+	def get_params_locals f
+		header = f.method_header
+		params = []
+		locals = []
+		for i in 2...header.inst_str.length
+			new_str =  header.inst_str[i]
+			# new_str = (new_str.split(":"))[0]
+			if new_str =~ "#-"
+				locals.push new_str.dup
+			else
+				params.push new_str.dup
+			end
+		end
+		[params, locals]
+	end
+
+	public
+	def inline(inst_idx, f1, f2)
+		if @instructions[inst_idx-1].opcode != "count"
+			puts "\n\n\nUninstrumented call???\n\n\n"
+			5/0
+		end
+		# Delete the counter -- not needed anymore
+		@instructions.delete_at (inst_idx - 1)
+		inst_idx -= 1
+
+		# Get the parameters and the local variables of the
+		# functions that will be inlined here
+		params_locals = get_params_locals(f2)
+		params = params_locals[0]
+		locals = params_locals[1]
+
+		map_new_locals = {}
+		# For each parameter of the function that will be inlined,
+		# create a new local variable in this function
+		params.each do |param|
+			f1.new_variable_index -= 4
+			new_var_name = "andre_var#" + f1.new_variable_index.to_s
+			map_new_locals[param] = new_var_name.dup + ":" + param.split(":")[1]
+		end
+		# For each local variable of the function that will be inlined,
+		# create a new local variable in this function
+		locals.each do |local|
+			f1.new_variable_index -= 4
+			new_var_name = "andre_var#" + f1.new_variable_index.to_s
+			map_new_locals[local] = new_var_name.dup + ":" + local.split(":")[1]
+		end
+
+		# Replace "param" by "moves"
+
+		i = inst_idx
+		j = params.length - 1
+		while j >= 0
+			i -= 1
+			while @instructions[i].opcode != "param"
+				i -= 1
+			end
+			# "i" now points to the next "param" instruction bottom-up
+
+			# Replace this "param" instruction by a "move"
+			new_move_str = "instr #{@instructions[i].id}: move #{@instructions[i].operands[0]} #{map_new_locals[params[j]].split(":")[0]}"
+			@instructions[i].reset( new_move_str.scan(/[^\s]+/) )
+
+			j -= 1
+		end
+
+		# Fix this function's "method" instruction to include the new locals
+		new_method = f1.method_header.inst_str.dup
+		new_vars = []
+		params.each do |param|
+			new_vars.push map_new_locals[param]
+		end
+		locals.each do |local|
+			new_vars.push map_new_locals[local]
+		end
+		new_vars.each do |var|
+			new_method.push var
+		end
+		f1.method_header.reset( new_method )
+
+		# Fix this function's "enter" and "return" instructions to allocate/free more space
+		start_idx = 0
+		start_addr = @functions_info[f1.name]
+		@instructions.each_index do |i|
+			if @instructions[i].id == start_addr
+				if @instructions[i].opcode == "entrypc"
+					start_idx = i + 1
+				else
+					start_idx = i
+				end
+			end
+		end
+
+		# start_idx must point to an "enter" instruction here
+		@instructions[start_idx].inst_str[3] = @instructions[start_idx].operands[0] + 4*(params.length + locals.length)
+		@instructions[start_idx].reset( @instructions[start_idx].inst_str.dup )
+
+		start_idx += 1
+		while (start_idx < @instructions.length) && (@instructions[start_idx].opcode != "enter") && (@instructions[start_idx].opcode != "entrypc")
+			if @instructions[start_idx].opcode == "ret"
+				@instructions[start_idx].inst_str[3] = @instructions[start_idx].operands[0] + 4*(params.length + locals.length)
+				@instructions[start_idx].reset( @instructions[start_idx].inst_str.dup )
+			end
+
+			start_idx += 1
+		end
+
+		# "inst_idx" should point to the call that will be inlined
+		@instructions.delete_at inst_idx
+
+		# Get the start and end index of the function that will be inlined
+		start_idx_f2 = 0
+		start_addr = @functions_info[f2.name]
+		@instructions.each_index do |i|
+			start_idx_f2 = i if @instructions[i].id == start_addr
+		end
+		start_idx_f2 += 1
+		# Handle "entrypc" case
+		start_idx_f2 += 1 if @instructions[start_idx_f2].opcode == "enter"
+
+		i = start_idx_f2
+		while (i < @instructions.length) && (@instructions[i].opcode != "enter") && (@instructions[i].opcode != "entrypc")
+			i += 1
+		end
+		# Last "ret" is not necessary
+		end_idx_f2 = i - 2
+
+		# Copy the instructions that will be inlined with the new id
+		# Create a map between old and new ids
+		tmp_insts = []
+		id_map = {}
+		i = start_idx
+		while i <= end_idx_f2
+			new_str = @instructions[i].inst_str.dup
+			old_id = new_str[1].chomp(':')
+			@last_inst_id += 1
+			new_str[1] = @last_inst_id.to_s + ":"
+			id_map[old_id] = @last_inst_id.to_s
+			new_inst = Instruction.new(new_str)
+			tmp_insts.push new_inst
+			i += 1
+		end
+
+		# Fix regs, jumps and everything related to ids
+		# "ret"s are replaced by branches
+		tmp_insts.each do |inst|
+			case inst.opcode
+			when "call", "br"
+				new_dest = id_map[inst.operand[0].to_s]
+				if new_dest != nil
+					new_str = inst.inst_str.dup
+					new_str[3] = "[" + new_dest + "]"
+					inst.reset( new_str )
+				end
+			when "blbc", "blbs"
+				new_dest = id_map[inst.operand[1].to_s]
+				if new_dest != nil
+					new_str = inst.inst_str.dup
+					new_str[4] = "[" + new_dest + "]"
+					inst.reset( new_str )
+				end
+			when "ret"
+				new_str = inst.inst_str.dup
+				new_str[2] = "br"
+				new_str[3] = "[" + @instructions[inst_idx].id.to_s + "]"
+				inst.reset( new_str )
+			when "sub", "add", "mul", "div", "mod", "cmpeq", "cmple", "cmplt", "store", "move", "checkbounds", "stdynamic"
+				new_str = inst.inst_str.dup
+				if new_str[3] =~ /\(/
+					reg = new_str[3].scan(/[\d]+/)
+					new_reg = id_map[reg]
+					if new_reg != nil
+						new_str[3] = "(" + new_reg + ")"
+					end
+				end
+				if new_str[4] =~ /\(/
+					reg = new_str[4].scan(/[\d]+/)
+					new_reg = id_map[reg]
+					if new_reg != nil
+						new_str[4] = "(" + new_reg + ")"
+					end
+				end
+				inst.reset( new_str )
+			when "istype", "checktype", "lddynamic", "isnull", "load", "new", "newlist", "checknull", "write", "param"
+				new_str = inst.inst_str.dup
+				if new_str[3] =~ /\(/
+					reg = new_str[3].scan(/[\d]+/)
+					new_reg = id_map[reg]
+					if new_reg != nil
+						new_str[3] = "(" + new_reg + ")"
+						inst.reset( new_str )
+					end
+				end
+			end
+		end
+
+
+		# Fix vars and params
+
+		params2 = params.dup
+		locals2 = locals.dup
+		map_new_locals2 = {}
+
+		params2.each_index do |i|
+			map_result = map_new_locals[params2[i]].split(":")[0]
+			params2[i] = params2[i].split(":")[0]
+			map_new_locals2[params2[i]] = map_result
+		end
+		locals2.each_index do |i|
+			map_result = map_new_locals[locals2[i]].split(":")[0]
+			locals2[i] = locals2[i].split(":")[0]
+			map_new_locals2[locals2[i]] = map_result
+		end
+
+		tmp_insts.each do |inst|
+			case inst.opcode
+			when "blbc", "blbs", "istype", "checktype", "lddynamic", "isnull", "load", "newlist", "checknull", "write", "param"
+				new_var = map_new_locals2[inst.inst_str[3]]
+				if new_var != nil
+					new_str = inst.inst_str.dup
+					new_str[3] = new_var.dup
+					inst.reset( new_str )
+				end
+			when "sub", "add", "mul", "div", "mod", "cmpeq", "cmple", "cmplt", "store", "move", "checkbounds", "stdynamic"
+				new_var = map_new_locals2[inst.inst_str[3]]
+				new_str = inst.inst_str.dup
+				if new_var != nil
+					new_str[3] = new_var.dup
+				end
+				new_var = map_new_locals2[inst.inst_str[4]]
+				if new_var != nil
+					new_str[4] = new_var.dup
+				end
+				inst.reset( new_str )
+
+
+			end
+		end
+
+		# Inline everything
+		tmp_insts.each do |inst|
+			@instructions.insert(inst_idx, inst)
+			inst_idx += 1
+		end
+
+	end
+
+	public
 	def instrument
   		@functions.each do |name, f|
 			ret = f.instrument(@last_inst_id, @last_counter)
