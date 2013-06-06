@@ -1,5 +1,5 @@
 class Function
-  attr_accessor :bbs, :name, :inst_str
+  attr_accessor :bbs, :name, :inst_str, :method_header, :new_variable_index
   attr_reader   :n_cprop, :n_expr_eliminated
   def initialize(name, inststr, initial_offset, header)
     @name = name
@@ -299,6 +299,7 @@ class Function
 
 	  end
       end
+      last_id
   end
 
 
@@ -568,6 +569,7 @@ class Function
       when "br"
         target = last_inst.operands[0]
         target_bb = bb_index[target]
+	#puts "Target: " + target.to_s if target_bb == nil
         bb.sucs.push target_bb
         target_bb.preds.push bb
       when "blbc", "blbs"

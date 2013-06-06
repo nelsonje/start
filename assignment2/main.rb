@@ -81,6 +81,9 @@ end
 p = Program.new
 p.read_program( ARGV[0] )
 
+# I need to inline before BBs are built
+p.parse_inline profile_filename if profile_filename != nil
+
 p.build_bbs
 p.build_cfgs
 

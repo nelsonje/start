@@ -11,7 +11,9 @@
 #echo loop
 #/usr/local/bin/ruby main.rb ../examples/loop.dart.il
 echo mmm
-/usr/local/bin/ruby main.rb ../examples/mmm.dart.il -opt=ssa,profile -backend=ssa
+/usr/local/bin/ruby main.rb ../examples/mmm.dart.il -opt=ssa,profile -backend=ssa,ir,cfg
+dart ../mydart/start/bin/start.dart --stats --run ../examples/mmm.dart.ilo > mmm.prof
+#/usr/local/bin/ruby main.rb ../examples/mmm.dart.il -opt=ssa -backend=ssa,ir,cfg -profile=mmm.prof
 #echo points
 #/usr/local/bin/ruby main.rb ../examples/points.dart.il
 #echo prime

@@ -30,7 +30,7 @@ class Program
 		result = false
 		start_idx = 0
 		@instructions.each_index do |i|
-			if @instructions[i].id == start_addr
+			if (@instructions[i] != nil) && (@instructions[i].id == start_addr)
 				if @instructions[i].opcode == "entrypc"
 					start_idx = i + 1
 				elsif @instructions[i].opcode == "enter"
@@ -42,9 +42,12 @@ class Program
 			end
 		end
 		start_idx += 1
+		#puts "Start addr: " + start_addr.to_s + "\tstart_idx: " + start_idx.to_s
 		while (start_idx < @instructions.length) && (@instructions[start_idx].opcode != "enter") && (@instructions[start_idx].opcode != "entrypc")
 			result = true if (@instructions[start_idx].opcode == "call") && (@instructions[start_idx].operands[0] == start_addr)
+			start_idx += 1
 		end
+		#puts "Final start_idx: " + start_idx.to_s
 		result
 	end
 
@@ -56,7 +59,7 @@ class Program
 		for i in 2...header.inst_str.length
 			new_str =  header.inst_str[i]
 			# new_str = (new_str.split(":"))[0]
-			if new_str =~ "#-"
+			if new_str =~ /#-/
 				locals.push new_str.dup
 			else
 				params.push new_str.dup
@@ -67,13 +70,13 @@ class Program
 
 	public
 	def inline(inst_idx, f1, f2)
-		if @instructions[inst_idx-1].opcode != "count"
-			puts "\n\n\nUninstrumented call???\n\n\n"
-			5/0
-		end
+		#if @instructions[inst_idx-1].opcode != "count"
+		#	puts "\n\n\nUninstrumented call???\n\n\n"
+		#	5/0
+		#end
 		# Delete the counter -- not needed anymore
-		@instructions.delete_at (inst_idx - 1)
-		inst_idx -= 1
+		#@instructions.delete_at (inst_idx - 1)
+		#inst_idx -= 1
 
 		# Get the parameters and the local variables of the
 		# functions that will be inlined here
@@ -133,7 +136,7 @@ class Program
 		start_idx = 0
 		start_addr = @functions_info[f1.name]
 		@instructions.each_index do |i|
-			if @instructions[i].id == start_addr
+			if (@instructions[i] != nil) && (@instructions[i].id == start_addr)
 				if @instructions[i].opcode == "entrypc"
 					start_idx = i + 1
 				else
@@ -157,13 +160,14 @@ class Program
 		end
 
 		# "inst_idx" should point to the call that will be inlined
+		call_id = @instructions[inst_idx].id
 		@instructions.delete_at inst_idx
 
 		# Get the start and end index of the function that will be inlined
 		start_idx_f2 = 0
 		start_addr = @functions_info[f2.name]
 		@instructions.each_index do |i|
-			start_idx_f2 = i if @instructions[i].id == start_addr
+			start_idx_f2 = i if (@instructions[i] != nil) && (@instructions[i].id == start_addr)
 		end
 		start_idx_f2 += 1
 		# Handle "entrypc" case
@@ -180,7 +184,18 @@ class Program
 		# Create a map between old and new ids
 		tmp_insts = []
 		id_map = {}
-		i = start_idx
+		# There might be jumps to the "ret" instructions of the inlined function
+		id_map[@instructions[end_idx_f2+1].id.to_s] = (call_id + 1).to_s
+		i = start_idx_f2
+
+		#First instruction gotta have the id of the call
+		new_str = @instructions[i].inst_str.dup
+		old_id = new_str[1].chomp(':')
+		new_str[1] = call_id.to_s + ":"
+		id_map[old_id] = call_id.to_s
+		new_inst = Instruction.new(new_str)
+		tmp_insts.push new_inst
+		i += 1
 		while i <= end_idx_f2
 			new_str = @instructions[i].inst_str.dup
 			old_id = new_str[1].chomp(':')
@@ -197,20 +212,26 @@ class Program
 		tmp_insts.each do |inst|
 			case inst.opcode
 			when "call", "br"
-				new_dest = id_map[inst.operand[0].to_s]
+				new_dest = id_map[inst.operands[0].to_s]
 				if new_dest != nil
 					new_str = inst.inst_str.dup
 					new_str[3] = "[" + new_dest + "]"
 					inst.reset( new_str )
 				end
-			# Fix: handle the first argument if it's a reg
 			when "blbc", "blbs"
-				new_dest = id_map[inst.operand[1].to_s]
+				new_dest = id_map[inst.operands[1].to_s]
+				new_str = inst.inst_str.dup
 				if new_dest != nil
-					new_str = inst.inst_str.dup
 					new_str[4] = "[" + new_dest + "]"
-					inst.reset( new_str )
 				end
+				if new_str[3] =~ /\(/
+					reg = new_str[3].scan(/[\d]+/)[0]
+					new_reg = id_map[reg]
+					if new_reg != nil
+						new_str[3] = "(" + new_reg + ")"
+					end
+				end
+				inst.reset( new_str )
 			when "ret"
 				new_str = inst.inst_str.dup
 				new_str[2] = "br"
@@ -219,14 +240,14 @@ class Program
 			when "sub", "add", "mul", "div", "mod", "cmpeq", "cmple", "cmplt", "store", "move", "checkbounds", "stdynamic"
 				new_str = inst.inst_str.dup
 				if new_str[3] =~ /\(/
-					reg = new_str[3].scan(/[\d]+/)
+					reg = new_str[3].scan(/[\d]+/)[0]
 					new_reg = id_map[reg]
 					if new_reg != nil
 						new_str[3] = "(" + new_reg + ")"
 					end
 				end
 				if new_str[4] =~ /\(/
-					reg = new_str[4].scan(/[\d]+/)
+					reg = new_str[4].scan(/[\d]+/)[0]
 					new_reg = id_map[reg]
 					if new_reg != nil
 						new_str[4] = "(" + new_reg + ")"
@@ -236,7 +257,7 @@ class Program
 			when "istype", "checktype", "lddynamic", "isnull", "load", "new", "newlist", "checknull", "write", "param"
 				new_str = inst.inst_str.dup
 				if new_str[3] =~ /\(/
-					reg = new_str[3].scan(/[\d]+/)
+					reg = new_str[3].scan(/[\d]+/)[0]
 					new_reg = id_map[reg]
 					if new_reg != nil
 						new_str[3] = "(" + new_reg + ")"
@@ -639,6 +660,57 @@ class Program
       end
 
       file.close
+  end
+
+  public
+  def parse_inline filename
+  	file = File.new(filename, "r")
+	map_id_count = {}
+	file.each_line do |line|
+		elems = line.split(":")
+		id = elems[0].to_i
+		count = elems[1].to_i
+		map_id_count[id] = count
+	end
+	file.close
+	n_calls = 0
+	threshold = 0
+	# Fix: if the inlined function calls another function, it's gonna be inlined too. I don't want this because of call cycles.
+	@instructions.each_index do |idx|
+		if (@instructions[idx] != nil) && (@instructions[idx].opcode == "call")
+			n_calls += 1
+			if map_id_count[n_calls] > threshold
+				name_f2 = nil
+				@functions_info.each do |name, start|
+					if (start == @instructions[idx].operands[0].to_i)
+						name_f2 = name
+					end
+				end
+				if !is_recursive(name_f2)
+					f2 = @functions[name_f2]
+					inst_idx = idx
+					tmp_idx = inst_idx - 1
+					while @instructions[tmp_idx].opcode != "enter"
+						tmp_idx -= 1
+					end
+					if @instructions[tmp_idx-1].opcode == "entrypc"
+						tmp_idx -= 1
+					end
+					f1 = nil
+					@functions_info.each do |name2, start2|
+						if start2 == @instructions[tmp_idx].id
+							f1 = @functions[name2]
+						end
+					end
+					puts "Inlining: f1: " + f1.name + "\tf2: " + f2.name + "\tcall idx: " + @instructions[inst_idx].id.to_s
+					inline(inst_idx, f1, f2) if @instructions[inst_idx].id == 34
+				end
+			end
+		end
+	end
+	@instructions.each do |inst|
+		p inst.inst_str if inst != nil
+	end
   end
 
   def parse_profile filename
