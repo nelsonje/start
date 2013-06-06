@@ -90,9 +90,9 @@ p.dump_info ARGV[0] if report_enabled
 
 p.capture_bb_map
 
-p.parse_profile profile_filename if profile_filename != nil
-
 p.instrument if profiling_enabled
+
+p.parse_profile profile_filename if profile_filename != nil
 
 p.to_ssa if ssa_enabled
 

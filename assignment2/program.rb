@@ -33,7 +33,7 @@ class Program
 			if @instructions[i].id == start_addr
 				if @instructions[i].opcode == "entrypc"
 					start_idx = i + 1
-				else if @instructions[i].opcode == "enter"
+				elsif @instructions[i].opcode == "enter"
 					start_idx = i
 				else
 					puts "\n\nBug in is_recursive\n\n"
@@ -203,6 +203,7 @@ class Program
 					new_str[3] = "[" + new_dest + "]"
 					inst.reset( new_str )
 				end
+			# Fix: handle the first argument if it's a reg
 			when "blbc", "blbs"
 				new_dest = id_map[inst.operand[1].to_s]
 				if new_dest != nil
