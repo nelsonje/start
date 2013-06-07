@@ -217,7 +217,7 @@ class Function
 	  end
       end
 
-      if false
+      if true
 	  # instrument dynamic
 	  @bbs.each do |bb|
 	      dynamic_indexes = []
@@ -271,6 +271,7 @@ class Function
 
   public
   def specialize_dynamic(last_id, types)
+  	if false
       @bbs.each do |bb|
 	  dynamic_indexes = []
 	  bb.instructions.each_index do |idx|
@@ -299,6 +300,7 @@ class Function
 
 	  end
       end
+        end
       last_id
   end
 

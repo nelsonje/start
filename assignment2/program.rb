@@ -926,11 +926,17 @@ class Program
   def parse_inline filename
   	file = File.new(filename, "r")
 	map_id_count = {}
+	reached_my_counters = false
+	my_next_counter = 1
 	file.each_line do |line|
 		elems = line.split(":")
 		id = elems[0].to_i
 		count = elems[1].to_i
-		map_id_count[id] = count
+		reached_my_counters = true if id == 1
+		if (reached_my_counters == true) && (id == my_next_counter)
+			map_id_count[id] = count
+			my_next_counter += 1
+		end
 	end
 	file.close
 	n_calls = 0
@@ -984,29 +990,35 @@ class Program
       likely_type_map = {}
 
       file = File.new(filename, "r")
+      next_inline_counter = 1
       file.each_line do |line|
 	  elems = line.split(":")
 
 	  id = elems[0].to_i
 	  count = elems[1].to_i
 
-	  lower_id = id & 0xffff
-	  upper_id = id >> 16
+          if id != next_inline_counter
 
-	  puts "Reading profile count upper #{upper_id} and lower #{lower_id} from #{line}" if $debug
+		  lower_id = id & 0xffff
+		  upper_id = id >> 16
 
-	  # capture basic block profile counts
-	  if upper_id != 0 
-	      if lower_id == 0
-		  bb_count_map[ upper_id ] = count
-	      else
-		  # capture type profiling
-		  if likely_type_map[ upper_id ].nil?
-		      likely_type_map[ upper_id ] = {}
+	  	puts "Reading profile count upper #{upper_id} and lower #{lower_id} from #{line}" if $debug
+
+		  # capture basic block profile counts
+		  if upper_id != 0 
+		      if lower_id == 0
+			  bb_count_map[ upper_id ] = count
+		      else
+			  # capture type profiling
+			  if likely_type_map[ upper_id ].nil?
+			      likely_type_map[ upper_id ] = {}
+			  end
+			  likely_type_map[ upper_id ][ lower_id ] = count
+		      end
 		  end
-		  likely_type_map[ upper_id ][ lower_id ] = count
-	      end
-	  end
+	  else
+	  	next_inline_counter += 1 if id == next_inline_counter
+          end
       end
       file.close
 
