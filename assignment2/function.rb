@@ -217,7 +217,7 @@ class Function
 	  end
       end
 
-      if true
+      if false
 	  # instrument dynamic
 	  @bbs.each do |bb|
 	      dynamic_indexes = []
