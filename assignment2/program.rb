@@ -21,6 +21,8 @@ class Program
 
     @last_inst_id = 0
     @last_counter = 0
+
+    @id_idx = {}
     
   end
 
@@ -131,6 +133,7 @@ class Program
 			new_method.push var
 		end
 		f1.method_header.reset( new_method )
+		f1.inst_str = f1.method_header.inst_str
 
 		# Fix this function's "enter" and "return" instructions to allocate/free more space
 		start_idx = 0
@@ -564,30 +567,43 @@ class Program
   end
 
   private
+  def map_id_to_idx
+  	@instructions.each_index do |idx|
+		@id_idx[@instructions[idx].id] = idx if @instructions[idx] != nil
+	end
+  end
+
+  private
   def build_bbs_function(name, f_start, f_end)
-    starts = [f_start, (f_end + 1)]
-    for i in f_start..f_end
+    f_start_idx = @id_idx[f_start]
+    if f_end != (@instructions.length - 1)
+    	f_end_idx = @id_idx[f_end]
+    else
+    	f_end_idx = f_end
+    end
+    starts = [f_start_idx, f_end_idx + 1]
+    for i in f_start_idx..f_end_idx
       case @instructions[i].opcode
       when "br"
-        starts.push (i + 1) if i != f_end
-        starts.push @instructions[i].operands[0]
-        if (@instructions[i].operands[0] >= f_start) && (@instructions[i].operands[0] <= f_end)
-          starts.push @instructions[i].operands[0]
+        starts.push (i + 1) if i != f_end_idx
+        starts.push @id_idx[@instructions[i].operands[0]]
+        if (@id_idx[@instructions[i].operands[0]] >= f_start_idx) && (@id_idx[@instructions[i].operands[0]] <= f_end_idx)
+          starts.push @id_idx[@instructions[i].operands[0]]
         end
       when "blbc", "blbs"
-        starts.push (i + 1) if i != f_end
-        if (@instructions[i].operands[1] >= f_start) && (@instructions[i].operands[1] <= f_end)
-          starts.push @instructions[i].operands[1]
+        starts.push (i + 1) if i != f_end_idx
+        if (@id_idx[@instructions[i].operands[1]] >= f_start_idx) && (@id_idx[@instructions[i].operands[1]] <= f_end_idx)
+          starts.push @id_idx[@instructions[i].operands[1]]
         end
       when "ret"
-        starts.push (i + 1) if i != f_end
+        starts.push (i + 1) if i != f_end_idx
       when "call"
-        if (@instructions[i].operands[0] >= f_start) && (@instructions[i].operands[0] <= f_end)
-          starts.push @instructions[i].operands[0]
+        if (@id_idx[@instructions[i].operands[0]] >= f_start_idx) && (@id_idx[@instructions[i].operands[0]] <= f_end_idx)
+          starts.push @id_idx[@instructions[i].operands[0]]
         end
       when "nop"
         starts.push i
-        starts.push (i + 1) if i != f_end
+        starts.push (i + 1) if i != f_end_idx
       end
     end
     starts.uniq!
@@ -597,6 +613,7 @@ class Program
       last = starts.shift
       last -= 1 if last >= 1
       bb = BasicBlock.new(@instructions, first, last)
+      #puts "Building BB from id: " + @instructions[first].id.to_s + " to id: " + @instructions[last].id.to_s
       if (!(@functions[name].bbs.empty?)) && (@functions[name].bbs.last.instructions.last.opcode != "ret") && (@functions[name].bbs.last.instructions.last.opcode != "br")
         bb.preds.push @functions[name].bbs.last
         @functions[name].bbs.last.sucs.push bb
@@ -608,6 +625,7 @@ class Program
 
   public
   def build_bbs
+    map_id_to_idx
     sorted_funcs = @functions_info.sort_by {|func, start| start}
     start = sorted_funcs.shift
     while !sorted_funcs.empty?
@@ -702,15 +720,19 @@ class Program
 							f1 = @functions[name2]
 						end
 					end
-					puts "Inlining: f1: " + f1.name + "\tf2: " + f2.name + "\tcall idx: " + @instructions[inst_idx].id.to_s
-					inline(inst_idx, f1, f2) if @instructions[inst_idx].id == 34
+					#puts "Inlining: f1: " + f1.name + "\tf2: " + f2.name + "\tcall idx: " + @instructions[inst_idx].id.to_s
+					inline(inst_idx, f1, f2)
 				end
 			end
 		end
 	end
-	@instructions.each do |inst|
-		p inst.inst_str if inst != nil
-	end
+	#@header.each do |inst|
+	#	p inst.inst_str
+	#end
+	# andreolb
+	#@instructions.each do |inst|
+	#	p inst.inst_str if inst != nil
+	#end
   end
 
   def parse_profile filename
