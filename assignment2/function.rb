@@ -271,7 +271,6 @@ class Function
 
   public
   def specialize_dynamic(last_id, types)
-  	if false
       @bbs.each do |bb|
 	  dynamic_indexes = []
 	  bb.instructions.each_index do |idx|
@@ -284,7 +283,11 @@ class Function
 	      if not ins.likely_type_id.nil?
 		  type = types[ ins.likely_type_id ]
 		  typename = type.id
-		  field = ins.operands[2].split("_")[0]
+		  if ins.opcode == "stdynamic"
+		  	field = ins.operands[2].split("_")[0]
+		  else
+		  	field = ins.operands[1].split("_")[0]
+		  end
 		  offset = type.fields[ field ]
 		  puts "Specializing #{ins.id}: #{ins.opcode} #{ins.operands[0]} #{ins.operands[1]} #{ins.operands[2]} to type #{ typename } offset #{ offset }" if $debug
 	      end
@@ -300,7 +303,6 @@ class Function
 
 	  end
       end
-        end
       last_id
   end
 
