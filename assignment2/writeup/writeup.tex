@@ -16,11 +16,12 @@
 \author{Andre Baixo, Jacob Nelson}
 \maketitle
 
+In this assignment, we implemented profile-guided function inlining.
 
 Our static optimizations, implemented in the previous homework, did not
 produce the correct result for some of the benchmarks. We started this
 work by fixing \emph{all} the static optimizations, which now produce
-the correct output for all the benchmarks used.
+the correct output for all the benchmarks used, including richards.
 
 On top of this, we instrumented function calls, basic blocks and
 dynamic load and store instructions, which are the most expensive
@@ -40,6 +41,61 @@ After this, we replace the \emph{param} instructions that preceed the call that 
 inlined, removing its last \emph{ret} instructions and replacing each of the other \emph{ret}s that might be present in the callee by a branch to the intruction that comes after
 the call that is being replaced in the caller (this instruction is also the new target of any callee instruction that jump to the callee's final \emph{ret}.) Finally, every reference to a register, variable, parameter or target is updated to reflect the new position of the code.
 
+\paragraph{Type speculation}
+
+Load and store dynamic are by far the most expensive instructions in
+the interpreter. For this reason, we attempted an implementation of
+type speculation for load and store dynamic
+instructions. Unfortunately, we were not able to debug this
+optimization in time.
+
+To apply this optimization, We collected type occurence data for each
+load or store dynamic instruction as discussed in the assignment, and
+then used this data to add a special case for the most common type
+used in each instruction instance. This special case would assume the
+type was the expected one, and would speculatively compute the field
+offset and load the filed data before testing the type and branching
+to a recovery path that applied the dynamic instruction. 
+
+One complexity in making this work is that the load dynamic
+instruction automatically boxes integer fields; even when the field is
+a raw integer, the instruction returns a pointer to a boxed
+integer. This required us to add a special case to the optimization to
+create a new boxed integer and fill in the value with the one we
+loaded.
+
+Figure~\ref{fig:hammock} shows an example from class.dart. In this
+case we are loading a native integer field y from an object b of type
+B. Instructions 37--39 are the same in the optimized and unoptimized
+cases: they compute a pointer to b, load it and check that the result
+is not null. Instruction 40 starts the optimization---we test whether
+the loaded object is of type B. Then in instructions 41 and 42, we
+speculatively compute the y field offset and load the data. Since this
+is a raw integer, we must box it, so instructions 43--45 creates a new
+boxed integer and store the loaded data into i. Finally in instruction
+46, we store the pointer to the boxed integer into a temporary variable. 
+
+Instruction 47 uses the result of the type check to branch to the
+dynamic fallback case in BB 91. When the type doesn't match our
+speculation, we run the standard dynamic instruction and store the
+result into our temporary variable. 
+
+Finally, the result of the optimization is used in instruction 48.
+
+\begin{figure}
+\begin{center}
+  \includegraphics[width=0.95\columnwidth]{figs/class-example.pdf}
+\begin{minipage}{0.95\columnwidth}
+  \caption{\label{fig:hammock} Type speculation example.}
+\end{minipage}
+\end{center}
+\end{figure}
+
+Unfortunately there are still bugs in this implementation: when we run
+it on class.dart, we see a 20 percent speedup, but we also get the
+wrong answer.
+
+\section{Performance}
 
 \begin{table}
 \begin{tabular}{llll}
@@ -51,39 +107,6 @@ vnumtest    & 537        & 541        & 466                  \\
 \end{tabular}
 \end{table}
 
-
-
-
-
-
-
-
-\paragraph{SSA} 
-We converted Start IL to SSA form using the algorithm described in
-class, using dominance frontiers to place phi functions.
-
-\paragraph{Constant Propagation} 
-We implemented simple constant propagation.
-
-\paragraph{Global Common Subexpression Elimination} 
-We implemented Value Numbering using the dominator-based algorithm.
-
-\paragraph{Conversion from SSA} 
-We use a naive approach, replacing phi functions with reads and writes
-of temporary variables. We follow this with a pass that promotes most
-SSA variables to registers in order to save instructions.
-
-\paragraph{Code generation} 
-We lay out code with a preorder traversal of the dominator tree for
-each function. Care must be taken to update all branch targets and
-function entry points.
-
-
-Besides the generated code, our optimizer writes two forms of
-debugging output. First, it dumps the all the requested information
-about blocks, instructions, and dominators to a file. Second, it
-writes the CFGs in GraphViz format. This may be converted to a
-graphical representation using the \texttt{dot} program.
 
 \section{Running}
 
@@ -115,8 +138,7 @@ Choices for backend include SSA deconversion, \texttt{ssa}; IL output,
 \texttt{ir}; CFG output, \texttt{cfg}. Reports are disabled in this
 version.
 
-
-There is a To apply profile-guided optimizations, first run with
+To apply profile-guided optimizations, first run with
 -opt=ssa,cse,scp,profile. When you run the program under start with
 stats enabled, you will get counter output. Copy just the counters
 into a .prof file (a few are included in the assignment2 directory),
@@ -127,199 +149,8 @@ profile-guided optimizations applied.
 Our optimizer is implemented in Ruby, so no separate build step is
 required. Ruby version 1.9 is required. 
 
-\section{SSA discussion}
-
-Conversion to SSA was reasonably stratightforward. We followed the
-approach discussed in class; we computed dominance frontiers in order
-to help us place phi functions. Then we used a collection of stacks to
-rename variables.
-
-Figure~\ref{fig:ssa-code} shows a simple test we used to debug our SSA
-conversion. Figure~\ref{fig:pressa} shows the CFG before SSA
-conversion, and Figure~\ref{fig:ssa} shows the CFG after SSA
-conversion. This example requires only one phi function merging the
-results of the four previous basic blocks; our phi functions have one
-entry for each predecessor, even if values are duplicated. We can see
-that the writes to the $x$ variable in the pre-SSA example are
-replaced with writes to five different SSA variables, with a fifth
-used to store the result of the phi function. We also see that the
-read-only variable $y$ is not touched by the SSA algorithm, and its
-initial value (denoted by a trailing \$ in our system) is used in the
-write operation.
-
-Figure~\ref{fig:postssa} shows the result of translating out of SSA in
-our system. The phi function in this example is replaced by writes to
-a temporary variable $\_\_x\$24$, which is allocated on the stack at
-offset $-12$. This temporary variable is read in BB 19 in the
-\texttt{write} instruction. Most of the intermediate SSA variables are
-replaced with registers; note in particular that BB 13 now contains
-only one memory write, instead of the three writes in SSA form.
-
-Converting from SSA was a bit hairy. First, since we added and removed
-instructions in the conversion, we had to renumber all instructions to
-be contiguous so that the Start VM wouldn't complain. This required
-fixing up all register operands, branch targets, and call
-sites. Second, when promoting SSA memory operations to registers, we
-had to fix up instructions that used the memory operations as
-operands. We used a symbol table to track equivalences as we added and
-removed instructions.
-
-\begin{figure}
-\begin{center}
-  \begin{verbatim}
-
-import 'stdio.dart';
-
-void main()
-{
-  int x;
-  int y;
-  x = 0;
-
-  if( 1 == 1 ) {
-    if( 1 == 1 ) {
-      x = x + 1;
-      if( 1 == 1 ) {
-        x = x + 1;
-        x = x + 1;
-        x = x + 1;
-      }
-    }
-  }
-
-  WriteLong(x);
-  WriteLong(y);
-  WriteLine();
-}
-
-\end{verbatim}
-\begin{minipage}{0.95\columnwidth}
-  \caption{\label{fig:ssa-code} Example program for SSA.}
-\end{minipage}
-\end{center}
-\end{figure}
 
 
-
-\begin{figure}
-\begin{center}
-  \includegraphics[width=0.95\columnwidth]{figs/simple6-pressa.pdf}
-\begin{minipage}{0.95\columnwidth}
-  \caption{\label{fig:pressa} CFG for Example~\ref{fig:ssa-code} before converting to SSA.}
-\end{minipage}
-\end{center}
-\end{figure}
-
-\begin{figure}
-\begin{center}
-  \includegraphics[width=0.95\columnwidth]{figs/simple6-ssa.pdf}
-\begin{minipage}{0.95\columnwidth}
-  \caption{\label{fig:ssa} CFG for Example~\ref{fig:ssa-code} in SSA form.}
-\end{minipage}
-\end{center}
-\end{figure}
-
-\begin{figure}
-\begin{center}
-  \includegraphics[width=0.95\columnwidth]{figs/simple6-postssa.pdf}
-\begin{minipage}{0.95\columnwidth}
-  \caption{\label{fig:postssa} CFG for Example~\ref{fig:ssa-code} after converting out of SSA.}
-\end{minipage}
-\end{center}
-\end{figure}
-
-
-\section{Constant propagation}
-
-We implemented simple sparse constant propagation. We chose not to do
-conditional constant propagation; neither did we remove dead code from
-branches that were killed by constant
-propagation.
-
-The algorithm used pushes all the instructions into a work list. While
-this list is not empty, we remove one instruction S from the list and check
-whether it is either a phi function with all the arguments equal to
-some constant \emph{c}, or a regular instruction whose result can be computed
-statically. In both cases we remove such instruction from the program and
-propagate its result to all the instructions that use the result of the deleted
-instruction. All the instructions that receive the propagated constant are
-added to the work list again.
-
-Figure~\ref{fig:regslarge-nothing} shows one simple code example. Similar instructions
-in sequence were grouped together to ease visualization. Notice that
-instructions 9 to 34 perform the same operation and then instructions 35 to 59 simply
-accumulate the result of each instruction from 9 to 34. Notice also that the variables
-added by instructions 9 to 34 can be determined statically: \texttt{b\$0} comes from
-instruction 5 and \texttt{c\$0} comes from instruction 6.
-
-The result of applying constant propagation to this example is shown in Figure~\ref{fig:regslarge-scp}.
-Now, instructions 10 to 34 were eliminated as they compute the same value computed by instruction 9.
-Then, each add used to accumulate the results from instructions 9 to 34 now uses the result of instruction 9.
-Next, notice that, in Figure~\ref{fig:regslarge-nothing}, instructions 63 to 88 do the same
-that instructions 9 to 34 did. Since this result was already calculated by instruction 9, instructions 63 to 88
-are completely eliminated after constant propagation (Figure~\ref{fig:regslarge-scp}). In addition, as instructions
-89 to 113 do the same that instructions 35 to 59 did (i.e. accumulate the result of instructions 89 to 113, which calculate the same value calculated
-by instructions 9 to 34,) they are also removed and the result is simply replaced by the value already
-calculated by instruction 59.
-
-
-\begin{figure*}
-\begin{center}
-\vspace{-1in}
-  \includegraphics[height=0.75\paperheight]{figs/andre1.pdf}
-\begin{minipage}{0.95\columnwidth}
-  \caption{\label{fig:regslarge-nothing} Subset of CFG from \texttt{regslarge.dart} without optimizations.}
-\end{minipage}
-\end{center}
-\end{figure*}
-
-
-\begin{figure*}
-\begin{center}
-\vspace{-1in}
-  \includegraphics[height=0.75\paperheight]{figs/andre2.pdf}
-\begin{minipage}{0.95\columnwidth}
-  \caption{\label{fig:regslarge-scp} Subset of CFG from \texttt{regslarge.dart} afer applying constant propagation.}
-\end{minipage}
-\end{center}
-\end{figure*}
-
-
-
-
-
-\section{Value numbering}
-
-We implemented value numbering for a mostly-arithmetic subset of the
-Start instruction set. Many of the other instructions had the
-potential of performing complicated and perhaps side-effectful
-operations in memory, and while we could possibly reason about
-situations where optimizations could be safe we chose to keep things
-simple.
-
-Figure~\ref{fig:regslarge-gce} shows the result of applying global common
-subexpression elimination to the example in Figure~\ref{fig:regslarge-nothing}.
-As discussed in the previous section, instructions 9 to 34 and 64 to 87 perform exactly
-the same operation over and over again. Also, instructions 35 to 59 and 89 to 113 simply
-accumulate the results of instructions 9 to 34 and 64 to 87, respectively. Since all
-these operations start with values that can be determined statically, value numbering
-detects the common subexpressions and calculate their values. The final value is simply
-used directly by instruction 60 in Figure~\ref{fig:regslarge-gce} and all the aforementioned
-instructions were eliminated.
-
-\begin{figure*}
-\begin{center}
-\vspace{-1in}
-  \includegraphics[height=0.75\paperheight]{figs/andre3.pdf}
-\begin{minipage}{0.95\columnwidth}
-  \caption{\label{fig:regslarge-gce} Subset of CFG from \texttt{regslarge.dart} afer applying value numbering.}
-\end{minipage}
-\end{center}
-\end{figure*}
-
-%\section{Conclusion}
-
-%We implemented a number of optimizations leveraging SSA representation.
 
 \bibliographystyle{abbrv}
 \bibliography{writeup}
