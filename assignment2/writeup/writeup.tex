@@ -25,13 +25,13 @@ the correct output for all the benchmarks used, including richards.
 
 On top of this, we instrumented function calls, basic blocks and
 dynamic load and store instructions, which are the most expensive
-operations. The goal was to implement profile-guided function inlining and type specialization.
+operations. The goal was to implement profile-guided function inlining and type speculation.
 
 The results show that profile-guided optimizations can considerably improve performance
 after static optimizations are applied.
 
 \paragraph{Function inlining}
-By counting the number of times that each call instruction is executed, it is possible to inline any call that is executed more times than a determined threshold. According to our experiments, a threshold of 100 calls yields the best speedup for /texttt{richards} benchmark, which is the application that benefits the most from inlining. Other benchmarks face negligible speedups or slowdowns, while \texttt{richards} have a 14\% speedup due to function inlining.
+By counting the number of times that each call instruction is executed, it is possible to inline any call that is executed more times than a determined threshold. According to our experiments, a threshold of 6 calls yields the best speedup for /texttt{richards} benchmark, which is the application that benefits the most from inlining. Other benchmarks face negligible speedups or slowdowns, while \texttt{richards} have a 13\% speedup due to function inlining.
 
 Function inlining is implemented as follows. First we detect the calls that were executed a number of times above the threshold. For each of these calls, if the called function is not the same that is calling (i.e. if caller and callee are not the same), the callee is inlined. If the inlined function itself has calls that were executed above the threshold, these are also inlined, as long as they do not introduce a call cycle.
 
@@ -49,7 +49,7 @@ type speculation for load and store dynamic
 instructions. Unfortunately, we were not able to debug this
 optimization in time.
 
-To apply this optimization, We collected type occurence data for each
+To apply this optimization, we collected type occurence data for each
 load or store dynamic instruction as discussed in the assignment, and
 then used this data to add a special case for the most common type
 used in each instruction instance. This special case would assume the
@@ -64,7 +64,7 @@ integer. This required us to add a special case to the optimization to
 create a new boxed integer and fill in the value with the one we
 loaded.
 
-Figure~\ref{fig:hammock} shows an example from class.dart. In this
+Figure~\ref{fig:hammock} shows an example from \texttt{class.dart}. In this
 case we are loading a native integer field y from an object b of type
 B. Instructions 37--39 are the same in the optimized and unoptimized
 cases: they compute a pointer to b, load it and check that the result
@@ -92,10 +92,21 @@ Finally, the result of the optimization is used in instruction 48.
 \end{figure}
 
 Unfortunately there are still bugs in this implementation: when we run
-it on class.dart, we see a 20 percent speedup, but we also get the
+it on \texttt{class.dart}, we see a 20 percent speedup, but we also get the
 wrong answer.
 
 \section{Performance}
+
+Table~\ref{results} shows the number of cycles needed to execute the four
+most interesting benchmarks. Notice that all the benchmarks exhibit a slowdown
+after performing simple constant propagation and global common subexpression elimination.
+The reason is probably that dead code elimination is not performed in order
+to get rid of unecessary copies introduced by both the static optimizations and the translation
+back from the SSA form.
+
+On the other hand, profile-guided function inlining improves performance for all the benchmarks.
+In fact, except for the \texttt{hanoifibfac} benchmark, function inlining overcomes the slowdown
+introduced by the static optimizations and surpass the unoptimized code.
 
 \begin{table}
 \begin{tabular}{llll}
@@ -105,6 +116,8 @@ hanoifibfac & 4548       & 5750       & 5416                 \\
 richards    & 26,933,770 & 29,493,534 & 25,840,024           \\
 vnumtest    & 537        & 541        & 466                  \\
 \end{tabular}
+\caption{Performance results in number of cycles.}
+\label{results}
 \end{table}
 
 
