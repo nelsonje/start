@@ -11,16 +11,23 @@
 \usepackage{microtype}
 \begin{document}
 
-\title{SSA Construction and Optimization\ \\
-  \small CSE 501 Spring 2013 Compilers Assignment 2}
+\title{Profile-guided Optimization\ \\
+  \small CSE 501 Spring 2013 Compilers Assignment 3}
 \author{Andre Baixo, Jacob Nelson}
 \maketitle
 
-This writeup describes our optimizer implementation for Assignment 2.
 
-\section{Implementation}
+In this assignment, we implemented profile-guided inlining. We 
 
-Our optimizer implements a number of optimizations. Here are the highlights:
+Our static optimizations, implemented in the previous homework, did no
+produce the correct result for some of the benchmarks. We started this
+work by fixing \emph{all} the static optimizations, which now produce
+the correct output for all the benchmarks used.
+
+On top of this, we instrumented function calls, basic blocks and
+dynamic load and store functions, which are the most expensive
+operation.s
+
 
 \paragraph{SSA} 
 We converted Start IL to SSA form using the algorithm described in
@@ -67,7 +74,9 @@ The script mostly follows the interface described in the assignment;
 optimizations are selected by specifying a comma-separated list to the
 \texttt{-opt=} flag, and similarily backends with the
 \texttt{-backend=} flag. We write output to files as specified above
-instead of stdout, since there is often a lot of output.
+instead of stdout, since there is often a lot of output. Choices for
+optimization include \texttt{ssa}, \texttt{scp}, \texttt{cse}, and
+\texttt{profile}. Using the
 
 Our optimizer is implemented in Ruby, so no separate build step is
 required. Ruby version 1.9 is required. 
