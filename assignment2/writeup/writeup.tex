@@ -83,9 +83,26 @@ The script mostly follows the interface described in the assignment;
 optimizations are selected by specifying a comma-separated list to the
 \texttt{-opt=} flag, and similarily backends with the
 \texttt{-backend=} flag. We write output to files as specified above
-instead of stdout, since there is often a lot of output. Choices for
-optimization include \texttt{ssa}, \texttt{scp}, \texttt{cse}, and
-\texttt{profile}. Using the
+instead of stdout, since there is often a lot of output. There is a
+new \texttt{-profile=} flag to specify counter output from the
+interpreter for applying profile-guided optimizations.
+
+Choices for optimization include \texttt{ssa}, \texttt{scp},
+\texttt{cse}, and \texttt{profile}. Using the \texttt{profile} option
+will add profiling instrumentation to the generated code.
+
+Choices for backend include SSA deconversion, \texttt{ssa}; IL output,
+\texttt{ir}; CFG output, \texttt{cfg}. Reports are disabled in this
+version.
+
+
+There is a To apply profile-guided optimizations, first run with
+-opt=ssa,cse,scp,profile. When you run the program under start with
+stats enabled, you will get counter output. Copy just the counters
+into a .prof file (a few are included in the assignment2 directory),
+and rerun the compiler with -opt=ssa,cse,scp and
+-profile=[filenamee]. This will generate a new .ilo file with the
+profile-guided optimizations applied.
 
 Our optimizer is implemented in Ruby, so no separate build step is
 required. Ruby version 1.9 is required. 
