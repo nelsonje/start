@@ -17,14 +17,17 @@
 \maketitle
 
 
-Our static optimizations, implemented in the previous homework, did no
+Our static optimizations, implemented in the previous homework, did not
 produce the correct result for some of the benchmarks. We started this
 work by fixing \emph{all} the static optimizations, which now produce
 the correct output for all the benchmarks used.
 
 On top of this, we instrumented function calls, basic blocks and
 dynamic load and store instructions, which are the most expensive
-operation
+operations. The goal was to implement profile-guided function inlining and type specialization.
+
+The results show that profile-guided optimizations can considerably improve performance
+after static optimizations are applied.
 
 \paragraph{Function inlining}
 By counting the number of times that each call instruction is executed, it is possible to inline any call that is executed more times than a determined threshold. According to our experiments, a threshold of 100 calls yields the best speedup for /texttt{richards} benchmark, which is the application that benefits the most from inlining. Other benchmarks face negligible speedups or slowdowns, while \texttt{richards} have a 14\% speedup due to function inlining.
