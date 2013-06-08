@@ -41,6 +41,23 @@ inlined, removing its last \emph{ret} instructions and replacing each of the oth
 the call that is being replaced in the caller (this instruction is also the new target of any callee instruction that jump to the callee's final \emph{ret}.) Finally, every reference to a register, variable, parameter or target is updated to reflect the new position of the code.
 
 
+\begin{table}
+\begin{tabular}{llll}
+~           & Unoptmized & scp + cse  & scp + cse + inlining \\
+cproptest   & 227        & 230        & 221                  \\
+hanoifibfac & 4548       & 5750       & 5416                 \\
+richards    & 26,933,770 & 29,493,534 & 25,840,024           \\
+vnumtest    & 537        & 541        & 466                  \\
+\end{tabular}
+\end{table}
+
+
+
+
+
+
+
+
 \paragraph{SSA} 
 We converted Start IL to SSA form using the algorithm described in
 class, using dominance frontiers to place phi functions.
