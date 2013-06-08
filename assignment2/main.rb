@@ -86,6 +86,8 @@ p.parse_inline profile_filename if profile_filename != nil
 
 p.build_bbs
 p.build_cfgs
+# Creating new BBs will not keep doms info ok
+p.parse_profile profile_filename if profile_filename != nil
 
 p.build_doms
 
@@ -95,7 +97,7 @@ p.capture_bb_map
 
 p.instrument if profiling_enabled
 
-p.parse_profile profile_filename if profile_filename != nil
+#p.parse_profile profile_filename if profile_filename != nil
 
 p.to_ssa if ssa_enabled
 

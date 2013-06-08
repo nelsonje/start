@@ -940,7 +940,7 @@ class Program
 	end
 	file.close
 	n_calls = 0
-	threshold = 0
+	threshold = 100
 	# Fix: if the inlined function calls another function, it's gonna be inlined too. I don't want this because of call cycles.
 	@instructions.each_index do |idx2|
 		idx = idx2 + @n_inlined
@@ -1042,7 +1042,7 @@ class Program
 	  end
 
 	  # now specialize dynamic instructions
-	  ret = f.specialize_dynamic(@last_inst_id, @types)
+	  ret = f.specialize_dynamic(@last_inst_id, @types, @header)
 	  @last_inst_id = ret
       end
 

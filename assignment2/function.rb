@@ -41,6 +41,7 @@ class Function
       # symbol table
       @symbol_table = {}
 
+	@new_vars = []
 
   end
 
@@ -270,17 +271,27 @@ class Function
   end
 
   public
-  def specialize_dynamic(last_id, types)
+  def specialize_dynamic(last_id, types, header)
+      new_bbs = []
       @bbs.each do |bb|
-	  dynamic_indexes = []
-	  bb.instructions.each_index do |idx|
-	      dynamic_indexes.push idx if bb.instructions[idx].opcode.include?("dynamic")
+      found = true
+      if found
+      	  found = false
+	  idx = nil
+	  bb.instructions.each_index do |i|
+	      if bb.instructions[i].opcode.include?("dynamic")
+	      	found = true
+		idx = i
+	      end
 	  end
 	  
-	  n_inserted = 0
-	  dynamic_indexes.each do |idx|
-	      ins = bb.instructions[idx + n_inserted]
-	      if not ins.likely_type_id.nil?
+	      ins = bb.instructions[idx] if idx != nil
+	      type = nil
+	      typename = nil
+	      offset = nil
+
+	      #this conditional guards everything else
+	      if found and not ins.likely_type_id.nil? and ins.opcode == "lddynamic"
 		  type = types[ ins.likely_type_id ]
 		  typename = type.id
 		  if ins.opcode == "stdynamic"
@@ -290,18 +301,173 @@ class Function
 		  end
 		  offset = type.fields[ field ]
 		  puts "Specializing #{ins.id}: #{ins.opcode} #{ins.operands[0]} #{ins.operands[1]} #{ins.operands[2]} to type #{ typename } offset #{ offset }" if $debug
+
+
+
+
+	      # Create the dynamic block
+	      dyn_block_insts = []
+	      # lddynamic
+	      last_id += 1
+	      lddynamic_id = last_id
+	      new_lddynamic_inst_str = ins.inst_str.dup
+	      new_lddynamic_inst_str[1] = (lddynamic_id.to_s + ":")
+	      new_lddynamic_inst = Instruction.new( new_lddynamic_inst_str )
+
+	      # move
+	      last_id += 1
+	      @new_variable_index -= 4
+	      new_local_var = "dyn_var#" + @new_variable_index.to_s
+	      @new_vars.push new_local_var.dup
+	      new_move_inst_str = "instr #{last_id.to_s}: move (#{(last_id - 1).to_s}) #{new_local_var}"
+	      new_move_inst = Instruction.new( new_move_inst_str.scan(/[^\s]+/) )
+
+	      # br
+	      last_id += 1
+	      new_br_inst_str = "instr #{last_id.to_s}: br [#{(ins.id + 1).to_s}]"
+	      new_br_inst = Instruction.new( new_br_inst_str.scan(/[^\s]+/) )
+
+	      dyn_block_insts.push new_lddynamic_inst
+	      dyn_block_insts.push new_move_inst
+	      dyn_block_insts.push new_br_inst
+
+	      dyn_block = BasicBlock.new(dyn_block_insts, 0, 2)
+	      dyn_block.sucs.push bb
+	      new_bbs.push dyn_block
+
+
+
+
+
+
+
+
+
+	      # Create the first BB
+	      first_bb_insts = []
+	      n_first_bb = 0
+	      for i in 0...idx
+	      	new_inst_str = bb.instructions[i].inst_str.dup
+		new_inst = Instruction.new( new_inst_str )
+		first_bb_insts.push new_inst
+		n_first_bb += 1
+	      end
+	      
+	      # istype inst
+	      n_type = 4
+	      header.each do |h_inst|
+	      	if h_inst.id == typename
+			h_inst.fields.each do |name, s|
+				n_type += s.to_i
+			end
+		end
+	      end
+	      new_istype_inst_str = "instr #{ins.id.to_s}: istype (#{(ins.id - 1).to_s}) #{typename}_type##{n_type.to_s} :bool"
+	      new_istype_inst = Instruction.new( new_istype_inst_str.scan(/[^\s]+/) )
+	      first_bb_insts.push new_istype_inst
+
+	      #blbc inst
+	      last_id += 1
+	      new_blbc_inst_str = "instr #{last_id.to_s}: blbc (#{ins.id.to_s}) [#{last_id - 3}]"
+	      new_blbc_inst = Instruction.new( new_blbc_inst_str.scan(/[^\s]+/) )
+	      first_bb_insts.push new_blbc_inst
+
+	      first_bb = BasicBlock.new(first_bb_insts, 0, n_first_bb + 1)
+	      dyn_block.preds.push first_bb
+	      bb.preds.each_index do |j|
+	      	first_bb.preds.push bb.preds[j]
+		bb.preds[j].sucs.each_index do |k|
+			bb.preds[j].sucs[k] = first_bb if bb.preds[j].sucs[k] == bb
+		end
+	      end
+	      new_bbs.push first_bb
+
+
+
+
+
+
+
+
+
+
+	      # Create fallthrough block
+	      fall_bb_insts = []
+	      
+	      # add inst
+	      last_id += 1
+	      new_add_inst_str = "instr #{last_id.to_s}: add (#{(ins.id - 1).to_s}) #{offset.to_s} :#{typename}*"
+	      new_add_inst = Instruction.new( new_add_inst_str.scan(/[^\s]+/) )
+	      fall_bb_insts.push new_add_inst
+
+	      # load inst
+	      last_id += 1
+	      new_load_inst_str = "instr #{last_id.to_s}: load (#{(last_id - 1).to_s}) :#{typename}"
+	      new_load_inst = Instruction.new( new_load_inst_str.scan(/[^\s]+/) )
+	      fall_bb_insts.push new_load_inst
+
+	      # move inst
+	      last_id += 1
+	      new_move2_inst_str = "instr #{last_id.to_s}: move (#{(last_id - 1).to_s}) #{new_local_var}"
+	      new_move2_inst = Instruction.new( new_move2_inst_str.scan(/[^\s]+/) )
+	      fall_bb_insts.push new_move2_inst
+
+	      fall_bb = BasicBlock.new(fall_bb_insts, 0, 2)
+	      first_bb.sucs.push fall_bb
+	      first_bb.sucs.push dyn_block
+	      fall_bb.preds.push first_bb
+	      fall_bb.sucs.push bb
+	      new_bbs.push fall_bb
+
+
+
+
+
+
+
+	      # Create the final block
+	      for i in 0..idx
+	      	bb.instructions.delete_at 0
+	      end
+	      bb.preds = []
+	      bb.preds.push fall_bb
+	      bb.preds.push dyn_block
 	      end
 
-	      # now create new basic block
-	      # move dynamic instruction there
-	      # add jump back when done
-	      # insert replacement squence:
-	      #   checktype
-	      #   branch to dynamic bb
-	      #   add offset to address
-	      #   load
 
-	  end
+      end
+      end
+
+      new_bbs.each_index do |i|
+      	@bbs.push new_bbs[i]
+	#p "BB"
+	#p new_bbs[i].instructions[0].inst_str
+	#p "Preds"
+	#new_bbs[i].preds.each do |p|
+	#	p p.instructions[0].inst_str
+	#end
+	#p "Sucs"
+	#new_bbs[i].sucs.each do |s|
+	#	p s.instructions[0].inst_str
+	#end
+	#p "\n"
+      end
+      @bbs.each do |bb|
+      	bb.instructions.each do |inst|
+		if inst.opcode == "enter"
+			new_val = inst.operands[0] + 4*(@new_vars.length)
+			new_inst_str = inst.inst_str.dup
+			new_inst_str[3] = new_val.to_s
+			inst.reset( new_inst_str )
+		end
+	end
+	new_m_str = @method_header.inst_str.dup
+	@new_vars.each do |var|
+		new_v = var.dup
+		new_v = new_v + ":int"
+		new_m_str.push new_v.dup
+		@method_header.reset( new_m_str )
+	end
       end
       last_id
   end
