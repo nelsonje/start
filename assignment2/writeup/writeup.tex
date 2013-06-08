@@ -16,6 +16,7 @@
 \author{Andre Baixo, Jacob Nelson}
 \maketitle
 
+\section{Introduction}
 In this assignment, we implemented profile-guided function inlining.
 
 Our static optimizations, implemented in the previous homework, did not
@@ -30,7 +31,7 @@ operations. The goal was to implement profile-guided function inlining and type 
 The results show that profile-guided optimizations can considerably improve performance
 after static optimizations are applied.
 
-\paragraph{Function inlining}
+\section{Function inlining}
 By counting the number of times that each call instruction is executed, it is possible to inline any call that is executed more times than a determined threshold. According to our experiments, a threshold of 6 calls yields the best speedup for /texttt{richards} benchmark, which is the application that benefits the most from inlining. Other benchmarks face negligible speedups or slowdowns, while \texttt{richards} have a 13\% speedup due to function inlining.
 
 Function inlining is implemented as follows. First we detect the calls that were executed a number of times above the threshold. For each of these calls, if the called function is not the same that is calling (i.e. if caller and callee are not the same), the callee is inlined. If the inlined function itself has calls that were executed above the threshold, these are also inlined, as long as they do not introduce a call cycle.
@@ -41,7 +42,7 @@ After this, we replace the \emph{param} instructions that preceed the call that 
 inlined, removing its last \emph{ret} instructions and replacing each of the other \emph{ret}s that might be present in the callee by a branch to the intruction that comes after
 the call that is being replaced in the caller (this instruction is also the new target of any callee instruction that jump to the callee's final \emph{ret}.) Finally, every reference to a register, variable, parameter or target is updated to reflect the new position of the code.
 
-\paragraph{Type speculation}
+\section{Type speculation}
 
 Load and store dynamic are by far the most expensive instructions in
 the interpreter. For this reason, we attempted an implementation of
@@ -101,7 +102,7 @@ Table~\ref{results} shows the number of cycles needed to execute the five
 most interesting benchmarks. Notice that, except for \texttt{mmm}, the benchmarks listed exhibit a slowdown
 after performing simple constant propagation and global common subexpression elimination.
 The reason is probably that dead code elimination is not performed in order
-to get rid of unecessary copies introduced by both the static optimizations and the translation
+to get rid of unnecessary copies introduced by both the static optimizations and the translation
 back from the SSA form. For \texttt{mmm} though, function inlining introduced some slowdown.
 Other benchmarks not listed experienced some speedup from static optimizations without any
 slowdown from inlining, as no call was inlined.
