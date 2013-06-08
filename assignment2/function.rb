@@ -366,13 +366,37 @@ class Function
 	      new_istype_inst = Instruction.new( new_istype_inst_str.scan(/[^\s]+/) )
 	      first_bb_insts.push new_istype_inst
 
+
+
+	      # Merging the fall through
+	      # add inst
+	      last_id += 1
+	      new_add_inst_str = "instr #{last_id.to_s}: add (#{(ins.id - 1).to_s}) #{offset.to_s} :#{typename}*"
+	      new_add_inst = Instruction.new( new_add_inst_str.scan(/[^\s]+/) )
+	      first_bb_insts.push new_add_inst
+	      # load inst
+	      last_id += 1
+	      new_load_inst_str = "instr #{last_id.to_s}: load (#{(last_id - 1).to_s}) :#{typename}"
+	      new_load_inst = Instruction.new( new_load_inst_str.scan(/[^\s]+/) )
+	      first_bb_insts.push new_load_inst
+	      # move inst
+	      last_id += 1
+	      new_move2_inst_str = "instr #{last_id.to_s}: move (#{(last_id - 1).to_s}) #{new_local_var}"
+	      new_move2_inst = Instruction.new( new_move2_inst_str.scan(/[^\s]+/) )
+	      first_bb_insts.push new_move2_inst
+
+
+
+
 	      #blbc inst
 	      last_id += 1
-	      new_blbc_inst_str = "instr #{last_id.to_s}: blbc (#{ins.id.to_s}) [#{last_id - 3}]"
+	      new_blbc_inst_str = "instr #{last_id.to_s}: blbc (#{ins.id.to_s}) [#{last_id - 3 - 3}]"
 	      new_blbc_inst = Instruction.new( new_blbc_inst_str.scan(/[^\s]+/) )
 	      first_bb_insts.push new_blbc_inst
 
-	      first_bb = BasicBlock.new(first_bb_insts, 0, n_first_bb + 1)
+	      first_bb = BasicBlock.new(first_bb_insts, 0, n_first_bb + 1 + 3)
+	      first_bb.sucs.push bb
+	      first_bb.sucs.push dyn_block
 	      dyn_block.preds.push first_bb
 	      bb.preds.each_index do |j|
 	      	first_bb.preds.push bb.preds[j]
@@ -392,32 +416,32 @@ class Function
 
 
 	      # Create fallthrough block
-	      fall_bb_insts = []
+	      #fall_bb_insts = []
 	      
 	      # add inst
-	      last_id += 1
-	      new_add_inst_str = "instr #{last_id.to_s}: add (#{(ins.id - 1).to_s}) #{offset.to_s} :#{typename}*"
-	      new_add_inst = Instruction.new( new_add_inst_str.scan(/[^\s]+/) )
-	      fall_bb_insts.push new_add_inst
+	      #last_id += 1
+	      #new_add_inst_str = "instr #{last_id.to_s}: add (#{(ins.id - 1).to_s}) #{offset.to_s} :#{typename}*"
+	      #new_add_inst = Instruction.new( new_add_inst_str.scan(/[^\s]+/) )
+	      #fall_bb_insts.push new_add_inst
 
 	      # load inst
-	      last_id += 1
-	      new_load_inst_str = "instr #{last_id.to_s}: load (#{(last_id - 1).to_s}) :#{typename}"
-	      new_load_inst = Instruction.new( new_load_inst_str.scan(/[^\s]+/) )
-	      fall_bb_insts.push new_load_inst
+	      #last_id += 1
+	      #new_load_inst_str = "instr #{last_id.to_s}: load (#{(last_id - 1).to_s}) :#{typename}"
+	      #new_load_inst = Instruction.new( new_load_inst_str.scan(/[^\s]+/) )
+	      #fall_bb_insts.push new_load_inst
 
 	      # move inst
-	      last_id += 1
-	      new_move2_inst_str = "instr #{last_id.to_s}: move (#{(last_id - 1).to_s}) #{new_local_var}"
-	      new_move2_inst = Instruction.new( new_move2_inst_str.scan(/[^\s]+/) )
-	      fall_bb_insts.push new_move2_inst
+	      #last_id += 1
+	      #new_move2_inst_str = "instr #{last_id.to_s}: move (#{(last_id - 1).to_s}) #{new_local_var}"
+	      #new_move2_inst = Instruction.new( new_move2_inst_str.scan(/[^\s]+/) )
+	      #fall_bb_insts.push new_move2_inst
 
-	      fall_bb = BasicBlock.new(fall_bb_insts, 0, 2)
-	      first_bb.sucs.push fall_bb
-	      first_bb.sucs.push dyn_block
-	      fall_bb.preds.push first_bb
-	      fall_bb.sucs.push bb
-	      new_bbs.push fall_bb
+	      #fall_bb = BasicBlock.new(fall_bb_insts, 0, 2)
+	      #first_bb.sucs.push fall_bb
+	      #first_bb.sucs.push dyn_block
+	      #fall_bb.preds.push first_bb
+	      #fall_bb.sucs.push bb
+	      #new_bbs.push fall_bb
 
 
 
@@ -429,8 +453,12 @@ class Function
 	      for i in 0..idx
 	      	bb.instructions.delete_at 0
 	      end
+	      new_check_str = bb.instructions[0].inst_str.dup
+	      new_check_str[3] = new_local_var.dup
+	      bb.instructions[0].reset( new_check_str )
 	      bb.preds = []
-	      bb.preds.push fall_bb
+	      #bb.preds.push fall_bb
+	      bb.preds.push first_bb
 	      bb.preds.push dyn_block
 	      end
 
@@ -461,6 +489,7 @@ class Function
 			inst.reset( new_inst_str )
 		end
 	end
+      end
 	new_m_str = @method_header.inst_str.dup
 	@new_vars.each do |var|
 		new_v = var.dup
@@ -468,7 +497,7 @@ class Function
 		new_m_str.push new_v.dup
 		@method_header.reset( new_m_str )
 	end
-      end
+	#p @method_header.inst_str
       last_id
   end
 
