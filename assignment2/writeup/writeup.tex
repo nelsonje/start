@@ -17,16 +17,25 @@
 \maketitle
 
 
-In this assignment, we implemented profile-guided inlining. We 
-
 Our static optimizations, implemented in the previous homework, did no
 produce the correct result for some of the benchmarks. We started this
 work by fixing \emph{all} the static optimizations, which now produce
 the correct output for all the benchmarks used.
 
 On top of this, we instrumented function calls, basic blocks and
-dynamic load and store functions, which are the most expensive
-operation.s
+dynamic load and store instructions, which are the most expensive
+operation
+
+\paragraph{Function inlining}
+By counting the number of times that each call instruction is executed, it is possible to inline any call that is executed more times than a determined threshold. According to our experiments, a threshold of 100 calls yields the best speedup for /texttt{richards} benchmark, which is the application that benefits the most from inlining. Other benchmarks face negligible speedups or slowdowns, while \texttt{richards} have a 14\% speedup due to function inlining.
+
+Function inlining is implemented as follows. First we detect the calls that were executed a number of times above the threshold. For each of these calls, if the called function is not the same that is calling (i.e. if caller and callee are not the same), the callee is inlined. If the inlined function itself has calls that were executed above the threshold, these are also inlined, as long as they do not introduce a call cycle.
+
+For inlining the function we first create a number of local variables in the caller equal to the number of local variables in the callee plus the number of parameters necessary for calling it. For this, we simply update the header of the caller function (we copy the types from the header of the called function), and then we update the \emph{enter} instruction of the caller to allocate space for the additional local variables.
+
+After this, we replace the \emph{param} instructions that preceed the call that will be inlined by \emph{move}s to the newly created local variables. The callee function is then
+inlined, removing its last \emph{ret} instructions and replacing each of the other \emph{ret}s that might be present in the callee by a branch to the intruction that comes after
+the call that is being replaced in the caller (this instruction is also the new target of any callee instruction that jump to the callee's final \emph{ret}.) Finally, every reference to a register, variable, parameter or target is updated to reflect the new position of the code.
 
 
 \paragraph{SSA} 
