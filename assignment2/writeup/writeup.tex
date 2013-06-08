@@ -111,7 +111,7 @@ In fact, except for the \texttt{hanoifibfac} benchmark, function inlining overco
 introduced by the static optimizations and surpass the unoptimized code. For \texttt{hanoifibfac}, inlining does improve
 performance, but it's not enough to overcome the slowdown introduced by the static optimizations.
 
-\begin{table}
+\begin{table}[b]
 \begin{tabular}{|l|l|l|l|} \hline
 ~           & \textbf{Unoptmized} & \textbf{scp + cse}  & \textbf{scp + cse + inlining} \\ \hline
 cproptest   & 227        & 230        & 221                  \\ \hline
