@@ -1,5 +1,5 @@
 class Instruction
-  attr_accessor   :id, :opcode, :operands, :rhs, :lhs, :ssa_mod_operands, :expr, :bb, :bl_operand, :pre_ssa_id, :post_ssa_id, :likely_type_id, :fields
+  attr_accessor   :id, :opcode, :operands, :rhs, :lhs, :ssa_mod_operands, :expr, :bb, :bl_operand, :pre_ssa_id, :post_ssa_id, :likely_type_id, :fields, :field_is_int
   attr_reader     :inst_str, :nop
 
   def initialize(inst)
@@ -26,10 +26,12 @@ class Instruction
 	@id = inst[1].chomp(":")
 	# parse type line and build field map
 	@fields = {}
+	@field_is_int = {}
 	inst.each do |s|
 	      if s.include?("#")
 		  a = s.split(/:|#/)
 		  @fields[ a[0] ] = a[1]
+		  @field_is_int[ a[0] ] = a[2] == "int"
 	      end
 	  end
     else

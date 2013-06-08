@@ -362,6 +362,8 @@ class Function
 			end
 		end
 	      end
+
+		  added_count = 1  # support different number of instructions in block
 	      new_istype_inst_str = "instr #{ins.id.to_s}: istype (#{(ins.id - 1).to_s}) #{typename}_type##{n_type.to_s} :bool"
 	      new_istype_inst = Instruction.new( new_istype_inst_str.scan(/[^\s]+/) )
 	      first_bb_insts.push new_istype_inst
@@ -371,30 +373,60 @@ class Function
 	      # Merging the fall through
 	      # add inst
 	      last_id += 1
+		  added_count += 1
 	      new_add_inst_str = "instr #{last_id.to_s}: add (#{(ins.id - 1).to_s}) #{offset.to_s} :#{typename}*"
 	      new_add_inst = Instruction.new( new_add_inst_str.scan(/[^\s]+/) )
 	      first_bb_insts.push new_add_inst
 	      # load inst
 	      last_id += 1
+		  added_count += 1
 	      new_load_inst_str = "instr #{last_id.to_s}: load (#{(last_id - 1).to_s}) :#{typename}"
 	      new_load_inst = Instruction.new( new_load_inst_str.scan(/[^\s]+/) )
 	      first_bb_insts.push new_load_inst
+		  
+		  # this is the register to move if the field is not a bare int
+		  move_target = last_id
+
+		  if type.field_is_int[ field ]
+		      # if field is bare int, we must box it.
+	      last_id += 1
+		  added_count += 1
+	      new_int_inst_str = "instr #{last_id.to_s}: new Integer_type#8 :Integer"
+	      new_int_inst = Instruction.new( new_int_inst_str.scan(/[^\s]+/) )
+	      first_bb_insts.push new_int_inst
+	      # offset of value
+	      last_id += 1
+		  added_count += 1
+	      new_offset_inst_str = "instr #{last_id.to_s}: add (#{(last_id - 1).to_s}) 4"
+	      new_offset_inst = Instruction.new( new_offset_inst_str.scan(/[^\s]+/) )
+	      first_bb_insts.push new_offset_inst
+	      # store in Integer
+	      last_id += 1
+		  added_count += 1
+	      new_store_inst_str = "instr #{last_id.to_s}: store (#{(last_id - 3).to_s}) (#{(last_id - 1).to_s})"
+	      new_store_inst = Instruction.new( new_store_inst_str.scan(/[^\s]+/) )
+	      first_bb_insts.push new_store_inst
+
+		  # this is the register to move if the field is a bare int
+		  move_target = last_id - 2
+		  end
+
 	      # move inst
 	      last_id += 1
-	      new_move2_inst_str = "instr #{last_id.to_s}: move (#{(last_id - 1).to_s}) #{new_local_var}"
+		  added_count += 1
+	      new_move2_inst_str = "instr #{last_id.to_s}: move (#{(move_target).to_s}) #{new_local_var}"
 	      new_move2_inst = Instruction.new( new_move2_inst_str.scan(/[^\s]+/) )
 	      first_bb_insts.push new_move2_inst
 
 
-
-
 	      #blbc inst
 	      last_id += 1
-	      new_blbc_inst_str = "instr #{last_id.to_s}: blbc (#{ins.id.to_s}) [#{last_id - 3 - 3}]"
+		  # make sure we point at the right target depending on the number of instructions we wrote.
+		  new_blbc_inst_str = "instr #{last_id.to_s}: blbc (#{ins.id.to_s}) [#{last_id - 3 - (added_count-1)}]"
 	      new_blbc_inst = Instruction.new( new_blbc_inst_str.scan(/[^\s]+/) )
 	      first_bb_insts.push new_blbc_inst
 
-	      first_bb = BasicBlock.new(first_bb_insts, 0, n_first_bb + 1 + 3)
+	      first_bb = BasicBlock.new(first_bb_insts, 0, n_first_bb + added_count)
 	      first_bb.sucs.push bb
 	      first_bb.sucs.push dyn_block
 	      dyn_block.preds.push first_bb
